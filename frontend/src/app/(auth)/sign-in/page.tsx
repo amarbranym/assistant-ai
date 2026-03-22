@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { SignInForm } from "@/features/auth/components/sign-in-form";
 
@@ -8,5 +9,13 @@ export const metadata: Metadata = {
 };
 
 export default function SignInPage() {
-  return <SignInForm />;
+  return (
+    <Suspense
+      fallback={
+        <p className="text-muted-foreground text-center text-sm">Loading…</p>
+      }
+    >
+      <SignInForm />
+    </Suspense>
+  );
 }

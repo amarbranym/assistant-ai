@@ -15,12 +15,10 @@
     "baseUrl": "./",
     "paths": {
       "@config/*": ["src/config/*"],
-      "@endpoints/*": ["src/endpoints/*"],
       "@modules/*": ["src/modules/*"],
-      "@middleware/*": ["src/middleware/*"],
-      "@utils/*": ["src/utils/*"],
-      "@queues/*": ["src/queues/*"],
-      "@types/*": ["src/types/*"]
+      "@middlewares/*": ["src/middlewares/*"],
+      "@common/*": ["src/common/*"],
+      "@utils/*": ["src/utils/*"]
     }
   },
   "include": ["src", "prisma"],

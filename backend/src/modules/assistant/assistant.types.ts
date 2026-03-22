@@ -1,4 +1,4 @@
-import type { AssistantConfig, AssistantConfigUpdate } from "../ai";
+import type { AssistantConfig, AssistantConfigUpdate } from "./assistant.validation";
 
 export interface CreateAssistantDTO {
   name: string;

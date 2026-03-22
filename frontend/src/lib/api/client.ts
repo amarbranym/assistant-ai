@@ -1,4 +1,5 @@
 import { env } from "@/config/env";
+import { getAccessToken } from "@/features/auth/lib/auth-storage";
 
 export function getApiBaseUrl(): string {
   return env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
@@ -10,8 +11,19 @@ type ApiEnvelope<T> = {
   error?: { message?: string };
 };
 
-function authHeaders(): HeadersInit {
-  return { "x-api-key": env.NEXT_PUBLIC_API_KEY };
+export type ApiRequestInit = RequestInit & {
+  /** Omit `Authorization` and `x-api-key` (e.g. login/register). */
+  skipAuth?: boolean;
+};
+
+function buildAuthHeaders(skipAuth?: boolean): HeadersInit {
+  if (skipAuth) return {};
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const key = env.NEXT_PUBLIC_API_KEY;
+  if (key) headers["x-api-key"] = key;
+  return headers;
 }
 
 /**
@@ -19,17 +31,18 @@ function authHeaders(): HeadersInit {
  */
 export async function apiRequest<T>(
   path: string,
-  init?: RequestInit
+  init?: ApiRequestInit
 ): Promise<T> {
+  const { skipAuth, ...rest } = init ?? {};
   const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
-  const hasBody = init?.body !== undefined && init?.body !== null;
+  const hasBody = rest.body !== undefined && rest.body !== null;
 
   const res = await fetch(url, {
-    ...init,
+    ...rest,
     headers: {
       ...(hasBody ? { "Content-Type": "application/json" } : {}),
-      ...authHeaders(),
-      ...(init?.headers ?? {}),
+      ...buildAuthHeaders(skipAuth),
+      ...(rest.headers ?? {}),
     },
   });
 

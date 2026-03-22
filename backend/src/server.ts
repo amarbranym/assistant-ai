@@ -1,7 +1,7 @@
 import { createServer } from "http";
 import { createApp } from "./app";
-import { env } from "./config/env/env";
-import { logger } from "./config/clients/logger";
+import { env } from "./config/env";
+import { logger } from "./config/logger";
 import { registerVoiceWebsocket } from "./realtime/voice-ws";
 
 async function bootstrap() {

@@ -1,5 +1,5 @@
-import { getPrismaClient } from "../../config/clients/prisma.client";
 import type { Prisma } from "@prisma/client";
+import { getPrismaClient } from "../../lib/prismaClient";
 import type { CreateAssistantDTO, UpdateAssistantDTO } from "./assistant.types";
 
 const prisma = getPrismaClient();
@@ -22,7 +22,10 @@ export async function getAssistantById(id: string) {
   return prisma.assistant.findUnique({ where: { id } });
 }
 
-export async function listAssistants(filters?: { projectId?: string; activeOnly?: boolean }) {
+export async function listAssistants(filters?: {
+  projectId?: string;
+  activeOnly?: boolean;
+}) {
   return prisma.assistant.findMany({
     where: {
       ...(filters?.projectId ? { projectId: filters.projectId } : {}),
@@ -41,7 +44,9 @@ export async function updateAssistant(id: string, data: UpdateAssistantDTO) {
       ...(data.projectId !== undefined ? { projectId: data.projectId ?? null } : {}),
       ...(data.active !== undefined ? { active: data.active } : {}),
       ...(data.config !== undefined
-        ? { config: JSON.parse(JSON.stringify(data.config)) as Prisma.InputJsonValue }
+        ? {
+            config: JSON.parse(JSON.stringify(data.config)) as Prisma.InputJsonValue
+          }
         : {})
     }
   });
@@ -49,4 +54,36 @@ export async function updateAssistant(id: string, data: UpdateAssistantDTO) {
 
 export async function deleteAssistant(id: string) {
   await prisma.assistant.delete({ where: { id } });
+}
+
+export async function getRecentMessages({
+  conversationId,
+  limit = 10
+}: {
+  conversationId: string;
+  limit?: number;
+}) {
+  return prisma.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: "asc" },
+    take: limit
+  });
+}
+
+export async function saveMessage({
+  conversationId,
+  role,
+  content
+}: {
+  conversationId: string;
+  role: "system" | "user" | "assistant" | "tool" | "data";
+  content: string;
+}) {
+  return prisma.message.create({
+    data: {
+      conversationId,
+      role,
+      content
+    }
+  });
 }

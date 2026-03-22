@@ -11,7 +11,7 @@ type Provider = "google" | "github" | "apple";
 function GoogleGlyph({ className }: { className?: string }) {
   return (
     <svg
-      className={cn("size-4 shrink-0", className)}
+      className={cn("size-[15px] shrink-0", className)}
       viewBox="0 0 24 24"
       aria-hidden
     >
@@ -43,54 +43,58 @@ type SocialAuthButtonsProps = {
 };
 
 /**
- * UI-only — wire each handler to your OAuth provider (Auth.js, Clerk, etc.).
+ * One row: icon + provider name each. Wire `onClick` to OAuth when ready.
  */
 export function SocialAuthButtons({ disabled }: SocialAuthButtonsProps) {
   const [notice, setNotice] = useState<string | null>(null);
 
   function handleSocial(provider: Provider) {
     setNotice(
-      `${provider === "google" ? "Google" : provider === "github" ? "GitHub" : "Apple"} sign-in will run once OAuth is configured (e.g. Auth.js / your IdP).`
+      `${provider === "google" ? "Google" : provider === "github" ? "GitHub" : "Apple"} — enable OAuth in your backend to use this.`
     );
   }
 
   return (
-    <div className="space-y-3">
-      <div className="grid gap-2">
+    <div className="flex flex-col gap-2">
+      <div
+        className="grid grid-cols-3 gap-2"
+        role="group"
+        aria-label="Sign in with a social account"
+      >
         <Button
           type="button"
           variant="outline"
-          className="h-10 w-full justify-center gap-2 font-normal"
+          className="border-border/80 text-foreground h-9 min-w-0 gap-1.5 px-2 text-xs font-normal"
           disabled={disabled}
           onClick={() => handleSocial("google")}
         >
           <GoogleGlyph />
-          Continue with Google
+          <span className="truncate">Google</span>
         </Button>
         <Button
           type="button"
           variant="outline"
-          className="h-10 w-full justify-center gap-2 font-normal"
+          className="border-border/80 text-foreground h-9 min-w-0 gap-1.5 px-2 text-xs font-normal"
           disabled={disabled}
           onClick={() => handleSocial("github")}
         >
-          <Github className="size-4" aria-hidden />
-          Continue with GitHub
+          <Github className="size-[15px] shrink-0" aria-hidden />
+          <span className="truncate">GitHub</span>
         </Button>
         <Button
           type="button"
           variant="outline"
-          className="h-10 w-full justify-center gap-2 font-normal"
+          className="border-border/80 text-foreground h-9 min-w-0 gap-1.5 px-2 text-xs font-normal"
           disabled={disabled}
           onClick={() => handleSocial("apple")}
         >
-          <Apple className="size-4" aria-hidden />
-          Continue with Apple
+          <Apple className="size-[15px] shrink-0" aria-hidden />
+          <span className="truncate">Apple</span>
         </Button>
       </div>
       {notice ? (
         <p
-          className="text-muted-foreground border-border bg-muted/30 rounded-lg border px-3 py-2 text-center text-xs leading-relaxed"
+          className="text-muted-foreground text-center text-[11px] leading-snug"
           role="status"
         >
           {notice}

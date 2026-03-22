@@ -22,12 +22,6 @@ export function AuthFormLayout({
   return (
     <div className="w-full">
       <div className="mb-8 text-center">
-        <Link
-          href="/assistants"
-          className="text-primary hover:text-primary/85 inline-block font-mono text-xs font-semibold tracking-widest uppercase"
-        >
-          Assistant
-        </Link>
         <h1 className="font-heading text-foreground mt-4 text-2xl font-semibold tracking-tight">
           {title}
         </h1>

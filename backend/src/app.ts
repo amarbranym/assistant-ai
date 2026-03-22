@@ -1,11 +1,13 @@
+import "./common/interfaces/request.interface";
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { json } from "express";
-import { logger } from "./config/clients/logger";
-import { env } from "./config/env/env";
-import { registerEndpoints } from "./endpoint-loader";
-import { errorHandler } from "./shared/middleware/error.middleware";
+import { logger } from "./config/logger";
+import { env } from "./config/env";
+import { registerRoutes } from "./routes";
+import { errorHandler } from "./middlewares/error.middleware";
 
 export const createApp = async () => {
   const app = express();
@@ -25,7 +27,6 @@ export const createApp = async () => {
     });
   });
 
-  // Versioned API health check (matches /api/v1 prefix)
   app.get("/api/v1/health", (_req, res) => {
     res.status(200).json({
       status: "ok",
@@ -33,7 +34,7 @@ export const createApp = async () => {
     });
   });
 
-  await registerEndpoints(app);
+  registerRoutes(app);
 
   app.use(errorHandler);
 
@@ -41,4 +42,3 @@ export const createApp = async () => {
 
   return app;
 };
-
