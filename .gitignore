@@ -1,0 +1,60 @@
+# =====================
+# Dependencies
+# =====================
+node_modules/
+
+# =====================
+# Environment (keep .env.example tracked)
+# =====================
+.env
+.env.*
+!.env.example
+
+# =====================
+# Logs
+# =====================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# =====================
+# Build outputs
+# =====================
+dist/
+build/
+.next/
+out/
+
+# =====================
+# Deploy / tooling
+# =====================
+.vercel
+.turbo
+
+# =====================
+# OS
+# =====================
+.DS_Store
+Thumbs.db
+
+# =====================
+# IDE
+# =====================
+.vscode/
+.idea/
+*.swp
+
+# =====================
+# TypeScript / tests
+# =====================
+*.tsbuildinfo
+coverage/
+
+# =====================
+# Secrets / local uploads
+# =====================
+*.pem
+uploads/
+tmp/
