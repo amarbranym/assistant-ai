@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { SignInForm } from "@/features/auth/components/sign-in-form";
+import { EmailAuthForm } from "@/features/auth/components/email-auth-form";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -15,7 +15,7 @@ export default function SignInPage() {
         <p className="text-muted-foreground text-center text-sm">Loading…</p>
       }
     >
-      <SignInForm />
+      <EmailAuthForm variant="sign-in" />
     </Suspense>
   );
 }

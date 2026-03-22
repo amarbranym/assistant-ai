@@ -50,9 +50,9 @@ export function VoiceConfigurationSection() {
     "";
 
   return (
-    <div className="space-y-3">
-      <Card className="border-border/80 py-4 shadow-theme">
-        <CardHeader className="pb-3 pt-0">
+    <div className="space-y-6">
+      <Card className="border-border/80 py-5 shadow-theme">
+        <CardHeader className="pb-4 pt-0">
           <CardTitle className="text-lg font-semibold tracking-tight">
             Voice
           </CardTitle>
@@ -61,8 +61,8 @@ export function VoiceConfigurationSection() {
             background audio and text chunking options.
           </p>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
+        <CardContent className="space-y-5">
+          <div className="grid gap-5 sm:grid-cols-2">
             <FormField
               id="ca-voice-provider"
               label="Provider"
@@ -173,8 +173,8 @@ export function VoiceConfigurationSection() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 py-4 shadow-theme">
-        <CardHeader className="pb-3 pt-0">
+      <Card className="border-border/80 py-5 shadow-theme">
+        <CardHeader className="pb-4 pt-0">
           <CardTitle className="text-base font-semibold tracking-tight">
             Advanced voice settings
           </CardTitle>
@@ -182,11 +182,11 @@ export function VoiceConfigurationSection() {
             Sliders, latency, quality boosts, and automation.
           </p>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-5">
           <p className="text-muted-foreground -mt-1 mb-1 text-xs font-medium">
             Voice controls
           </p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             <Controller
               name="voiceStability"
               control={control}
@@ -274,8 +274,8 @@ export function VoiceConfigurationSection() {
             />
           </div>
 
-          <div className="border-border my-2 border-t pt-2">
-            <p className="text-muted-foreground mb-2 text-xs font-medium">
+          <div className="border-border my-1 border-t pt-4">
+            <p className="text-muted-foreground mb-3 text-xs font-medium">
               Streaming & behavior
             </p>
           </div>

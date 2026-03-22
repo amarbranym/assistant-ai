@@ -23,14 +23,3 @@ export function created<T>(res: Response, data: T): Response<ApiResponse<T>> {
 export function noContent(res: Response): Response<ApiResponse<null>> {
   return res.status(204).json({ success: true, data: null });
 }
-
-export function error(
-  res: Response,
-  status: number,
-  payload: ApiError
-): Response<ApiResponse<null>> {
-  return res.status(status).json({
-    success: false,
-    error: payload
-  });
-}

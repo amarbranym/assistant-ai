@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async redirects() {
+    return [
+      {
+        source: "/verify-otp",
+        destination: "/sign-in",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

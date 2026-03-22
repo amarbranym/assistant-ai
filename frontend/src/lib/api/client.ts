@@ -8,7 +8,7 @@ export function getApiBaseUrl(): string {
 type ApiEnvelope<T> = {
   success: boolean;
   data?: T;
-  error?: { message?: string };
+  error?: { message?: string; code?: string };
 };
 
 export type ApiRequestInit = RequestInit & {
@@ -37,14 +37,25 @@ export async function apiRequest<T>(
   const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
   const hasBody = rest.body !== undefined && rest.body !== null;
 
-  const res = await fetch(url, {
-    ...rest,
-    headers: {
-      ...(hasBody ? { "Content-Type": "application/json" } : {}),
-      ...buildAuthHeaders(skipAuth),
-      ...(rest.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...rest,
+      headers: {
+        ...(hasBody ? { "Content-Type": "application/json" } : {}),
+        ...buildAuthHeaders(skipAuth),
+        ...(rest.headers ?? {}),
+      },
+    });
+  } catch (e) {
+    const base = getApiBaseUrl();
+    if (e instanceof TypeError) {
+      throw new Error(
+        `Cannot reach API at ${base} (${e.message}). Start the backend (e.g. \`npm run dev\` in the backend folder) or fix NEXT_PUBLIC_API_URL in frontend/.env.local.`
+      );
+    }
+    throw e;
+  }
 
   const text = await res.text();
   let parsed: ApiEnvelope<T> | null = null;
@@ -66,12 +77,18 @@ export async function apiRequest<T>(
         ? String((parsed as { error?: { message?: string } }).error?.message)
         : null) ??
       `HTTP ${res.status}`;
-    throw new Error(msg);
+    const err = new Error(msg) as Error & { code?: string };
+    if (parsed?.error?.code) err.code = parsed.error.code;
+    throw err;
   }
 
   if (parsed && typeof parsed === "object" && "success" in parsed) {
     if (!parsed.success) {
-      throw new Error(parsed.error?.message ?? "Request failed");
+      const err = new Error(parsed.error?.message ?? "Request failed") as Error & {
+        code?: string;
+      };
+      if (parsed.error?.code) err.code = parsed.error.code;
+      throw err;
     }
     return parsed.data as T;
   }

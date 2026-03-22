@@ -4,8 +4,3 @@ export type AuthUser = {
   name: string;
   createdAt: string;
 };
-
-export type AuthSession = {
-  user: AuthUser;
-  accessToken: string;
-};

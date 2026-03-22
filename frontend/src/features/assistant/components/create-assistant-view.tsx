@@ -1,13 +1,7 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
-
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
-import { ASSISTANTS_ROUTE } from "../lib/constants";
 import { CreateAssistantForm } from "./create-assistant/create-assistant-form";
 
 export function CreateAssistantView() {

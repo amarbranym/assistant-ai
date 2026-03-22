@@ -180,7 +180,7 @@ export function CreateAssistantForm({
           <div className="border-border bg-background sticky top-0 z-30 touch-manipulation border-b  pb-px ">
             <TabsList
               aria-label="Assistant configuration sections"
-              className="w-full justify-start border-0 bg-transparent p-0"
+              className="w-full justify-start gap-2 border-0 bg-transparent p-0 sm:gap-3"
             >
               {CREATE_ASSISTANT_TABS.map((tab) => {
                 const Icon = TAB_ICONS[tab.value];
@@ -405,7 +405,7 @@ export function CreateAssistantForm({
             </Card>
           </TabsContent>
 
-          <TabsContent value="voice">
+          <TabsContent value="voice" className=" gap-0">
             <VoiceConfigurationSection />
           </TabsContent>
 
@@ -443,7 +443,7 @@ export function CreateAssistantForm({
             </Card>
           </TabsContent>
 
-          <TabsContent value="advanced">
+          <TabsContent value="advanced" className="mt-8 gap-0">
             <AdvancedVoiceConfigurationSection />
           </TabsContent>
         </Tabs>

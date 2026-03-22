@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { SignUpForm } from "@/features/auth/components/sign-up-form";
+import { EmailAuthForm } from "@/features/auth/components/email-auth-form";
 
 export const metadata: Metadata = {
   title: "Sign up",
@@ -15,7 +15,7 @@ export default function SignUpPage() {
         <p className="text-muted-foreground text-center text-sm">Loading…</p>
       }
     >
-      <SignUpForm />
+      <EmailAuthForm variant="sign-up" />
     </Suspense>
   );
 }

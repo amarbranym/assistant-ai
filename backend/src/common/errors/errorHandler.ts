@@ -1,8 +1,21 @@
+import { Prisma } from "@prisma/client";
 import { ErrorRequestHandler } from "express";
 import { logger } from "../../config/logger";
 import { AppError } from "./AppError";
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  if (err instanceof Prisma.PrismaClientInitializationError) {
+    logger.error({ err }, "Database unavailable");
+    return res.status(503).json({
+      success: false,
+      error: {
+        message:
+          "Database is unreachable. Check DATABASE_URL in .env, that the database is running (e.g. Supabase project not paused), and try the Supabase pooler URL (port 6543) if direct port 5432 is blocked.",
+        code: "DATABASE_UNAVAILABLE"
+      }
+    });
+  }
+
   const isApp = err instanceof AppError;
   const status = isApp
     ? err.status

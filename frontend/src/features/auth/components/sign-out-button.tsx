@@ -1,25 +1,22 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { logoutUser } from "../api/auth.api";
-import { AUTH_ME_QUERY_KEY } from "../hooks/use-auth-user";
+import { useAuth } from "../context/auth-context";
 import { SIGN_IN_ROUTE } from "../lib/routes";
 
 export function SignOutButton() {
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const { signOut } = useAuth();
   const [pending, setPending] = useState(false);
 
   async function onSignOut() {
     setPending(true);
     try {
-      await logoutUser();
-      await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
+      await signOut();
       router.push(SIGN_IN_ROUTE);
       router.refresh();
     } finally {

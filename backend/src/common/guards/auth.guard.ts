@@ -2,7 +2,7 @@ import { NextFunction, Response } from "express";
 import type { RequestWithUser } from "../interfaces/request.interface";
 
 /**
- * Ensures `req.user` exists (run after JWT middleware).
+ * Ensures `req.user` exists (run after `authMiddleware` attaches Bearer user).
  */
 export function requireAuthGuard(
   req: RequestWithUser,

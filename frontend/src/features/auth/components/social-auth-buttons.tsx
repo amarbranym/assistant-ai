@@ -5,8 +5,17 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  createBrowserSupabaseClient,
+  isSupabaseEnvConfigured,
+} from "@/lib/supabase/client";
 
-type Provider = "google" | "github" | "apple";
+import { DEFAULT_POST_AUTH_PATH, SUPABASE_ENV_MISSING_MESSAGE } from "../constants";
+import { formatAuthError } from "../lib/auth-errors";
+import { sanitizeReturnPath } from "../lib/return-path";
+
+const OAUTH_BUTTON_CLASS =
+  "border-border/80 text-foreground h-10 w-full min-w-0 justify-center gap-2 px-3 text-sm font-normal";
 
 function GoogleGlyph({ className }: { className?: string }) {
   return (
@@ -40,33 +49,61 @@ function GoogleGlyph({ className }: { className?: string }) {
 
 type SocialAuthButtonsProps = {
   disabled?: boolean;
+  oauthReturnPath?: string;
 };
 
-/**
- * One row: icon + provider name each. Wire `onClick` to OAuth when ready.
- */
-export function SocialAuthButtons({ disabled }: SocialAuthButtonsProps) {
-  const [notice, setNotice] = useState<string | null>(null);
+type Provider = "google" | "github" | "apple";
 
-  function handleSocial(provider: Provider) {
-    setNotice(
-      `${provider === "google" ? "Google" : provider === "github" ? "GitHub" : "Apple"} — enable OAuth in your backend to use this.`
+async function signInWithProvider(provider: Provider, returnPath: string) {
+  const supabase = createBrowserSupabaseClient();
+  if (!supabase) {
+    throw new Error(SUPABASE_ENV_MISSING_MESSAGE);
+  }
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(returnPath)}`;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo },
+  });
+  if (error) throw error;
+}
+
+export function SocialAuthButtons({
+  disabled,
+  oauthReturnPath = DEFAULT_POST_AUTH_PATH,
+}: SocialAuthButtonsProps) {
+  const [oauthError, setOauthError] = useState<string | null>(null);
+  const safeReturnPath = sanitizeReturnPath(oauthReturnPath, DEFAULT_POST_AUTH_PATH);
+  const configured = isSupabaseEnvConfigured();
+  const blocked = disabled || !configured;
+
+  function handleProvider(provider: Provider) {
+    setOauthError(null);
+    void signInWithProvider(provider, safeReturnPath).catch((e) =>
+      setOauthError(formatAuthError(e))
     );
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="space-y-2">
+      {oauthError ? (
+        <p className="text-destructive text-xs leading-snug" role="alert">
+          {oauthError}
+        </p>
+      ) : null}
       <div
-        className="grid grid-cols-3 gap-2"
+        className="flex flex-col gap-2"
         role="group"
         aria-label="Sign in with a social account"
       >
         <Button
           type="button"
           variant="outline"
-          className="border-border/80 text-foreground h-9 min-w-0 gap-1.5 px-2 text-xs font-normal"
-          disabled={disabled}
-          onClick={() => handleSocial("google")}
+          className={OAUTH_BUTTON_CLASS}
+          disabled={blocked}
+          title={!configured ? "Configure Supabase in .env.local" : undefined}
+          onClick={() => handleProvider("google")}
         >
           <GoogleGlyph />
           <span className="truncate">Google</span>
@@ -74,9 +111,10 @@ export function SocialAuthButtons({ disabled }: SocialAuthButtonsProps) {
         <Button
           type="button"
           variant="outline"
-          className="border-border/80 text-foreground h-9 min-w-0 gap-1.5 px-2 text-xs font-normal"
-          disabled={disabled}
-          onClick={() => handleSocial("github")}
+          className={OAUTH_BUTTON_CLASS}
+          disabled={blocked}
+          title={!configured ? "Configure Supabase in .env.local" : undefined}
+          onClick={() => handleProvider("github")}
         >
           <Github className="size-[15px] shrink-0" aria-hidden />
           <span className="truncate">GitHub</span>
@@ -84,22 +122,15 @@ export function SocialAuthButtons({ disabled }: SocialAuthButtonsProps) {
         <Button
           type="button"
           variant="outline"
-          className="border-border/80 text-foreground h-9 min-w-0 gap-1.5 px-2 text-xs font-normal"
-          disabled={disabled}
-          onClick={() => handleSocial("apple")}
+          className={OAUTH_BUTTON_CLASS}
+          disabled={blocked}
+          title={!configured ? "Configure Supabase in .env.local" : undefined}
+          onClick={() => handleProvider("apple")}
         >
           <Apple className="size-[15px] shrink-0" aria-hidden />
           <span className="truncate">Apple</span>
         </Button>
       </div>
-      {notice ? (
-        <p
-          className="text-muted-foreground text-center text-[11px] leading-snug"
-          role="status"
-        >
-          {notice}
-        </p>
-      ) : null}
     </div>
   );
 }

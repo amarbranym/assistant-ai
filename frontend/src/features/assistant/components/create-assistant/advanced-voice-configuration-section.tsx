@@ -27,8 +27,8 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="border-border/80 py-4 shadow-theme">
-      <CardHeader className="pb-3 pt-0">
+    <Card className="border-border/80 py-5 shadow-theme">
+      <CardHeader className="pb-4 pt-0">
         <CardTitle className="text-base font-semibold tracking-tight">
           {title}
         </CardTitle>
@@ -38,7 +38,7 @@ function SectionCard({
           </p>
         ) : null}
       </CardHeader>
-      <CardContent className="space-y-3">{children}</CardContent>
+      <CardContent className="space-y-5">{children}</CardContent>
     </Card>
   );
 }
@@ -56,7 +56,7 @@ export function AdvancedVoiceConfigurationSection() {
       title="Additional voice configuration"
       description="Optional audio bed, URL override, and text chunking hints."
     >
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <FormField
           id="ca-bg-sound"
           label="Background sound"

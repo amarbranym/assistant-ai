@@ -3,6 +3,7 @@ import type { Request } from "express";
 export interface UserContext {
   id: string;
   email?: string;
+  name?: string;
   role?: string;
 }
 

@@ -1,3 +1,4 @@
+import { DashboardAuthBoundary } from "@/components/layout/dashboard-auth-boundary";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 
 export default function DashboardLayout({
@@ -5,5 +6,9 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <DashboardAuthBoundary>
+      <DashboardShell>{children}</DashboardShell>
+    </DashboardAuthBoundary>
+  );
 }
