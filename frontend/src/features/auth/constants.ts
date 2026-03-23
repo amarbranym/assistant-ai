@@ -9,5 +9,13 @@ export const DEFAULT_POST_AUTH_PATH = "/assistants" as const;
 export const SIGNUP_CHECK_EMAIL_MESSAGE =
   "Check your email to confirm your account, then sign in." as const;
 
+/** Shown after `resetPasswordForEmail` succeeds. */
+export const PASSWORD_RESET_EMAIL_SENT_MESSAGE =
+  "If that email exists, we sent a password reset link." as const;
+
+/** Shown after `updateUser({ password })` succeeds on recovery session. */
+export const PASSWORD_UPDATED_MESSAGE =
+  "Your password was updated. You can now sign in." as const;
+
 /** Minimum password length enforced in the UI (align with Supabase project settings). */
 export const MIN_PASSWORD_LENGTH = 8;

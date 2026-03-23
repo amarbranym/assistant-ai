@@ -36,6 +36,44 @@ import type { AssistantRecord } from "../types/api-assistant";
 import { AssistantCard } from "./assistant-card";
 import { AssistantChatDrawer } from "./assistant-chat-drawer";
 
+function AssistantsLoadingSkeleton() {
+  return (
+    <div className="space-y-4" aria-hidden>
+      <div className="bg-muted/45 h-4 w-52 animate-pulse rounded-md" />
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <li key={`assistant-skeleton-${i}`}>
+            <div className="border-border bg-card h-full overflow-hidden rounded-lg border shadow-theme">
+              <div className="space-y-3 px-3 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="bg-muted/50 h-4 w-3/5 animate-pulse rounded-sm" />
+                    <div className="bg-muted/40 h-3 w-5/6 animate-pulse rounded-sm" />
+                  </div>
+                  <div className="bg-muted/50 size-7 animate-pulse rounded-md" />
+                </div>
+                <div className="bg-muted/45 h-5 w-16 animate-pulse rounded-full" />
+                <div className="space-y-2.5 pt-1">
+                  <div className="bg-muted/40 h-8 animate-pulse rounded-md" />
+                  <div className="bg-muted/40 h-8 animate-pulse rounded-md" />
+                </div>
+              </div>
+              <div className="bg-muted/20 border-border/70 border-t px-3 py-2.5">
+                <div className="bg-muted/40 mb-2 h-3.5 w-2/5 animate-pulse rounded-sm" />
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="bg-muted/50 h-7 animate-pulse rounded-md" />
+                  <div className="bg-muted/50 h-7 animate-pulse rounded-md" />
+                </div>
+              </div>
+            </div>
+          </li>
+        ))}
+        
+      </ul>
+    </div>
+  );
+}
+
 export function AssistantsBoard() {
   const router = useRouter();
   const {
@@ -110,7 +148,7 @@ export function AssistantsBoard() {
             </CardContent>
           </Card>
         ) : isPending ? (
-          <p className="text-muted-foreground text-sm">Loading assistants…</p>
+          <AssistantsLoadingSkeleton />
         ) : assistants.length === 0 ? (
           <Card className="rounded-lg border-dashed border-border bg-muted/20">
             <CardHeader>

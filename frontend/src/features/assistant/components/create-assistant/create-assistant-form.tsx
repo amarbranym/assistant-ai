@@ -201,35 +201,7 @@ export function CreateAssistantForm({
             <Card className="border-border/80 py-5 shadow-theme">
               <SectionCardHeader title="Model" description="Choose the model to use for your assistant." />
               <CardContent className="space-y-5">
-                {isEdit ? (
-                  <FormField
-                    id="ca-active"
-                    label="Assistant status"
-                    error={errors.active?.message}
-                  >
-                    <Controller
-                      name="active"
-                      control={control}
-                      render={({ field }) => (
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            id="ca-active"
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={pending}
-                            aria-invalid={!!errors.active}
-                          />
-                          <span className="text-muted-foreground text-sm">
-                            {field.value
-                              ? "Active — chat and talk are available"
-                              : "Inactive — conversations stay disabled"}
-                          </span>
-                        </div>
-                      )}
-                    />
-                  </FormField>
-                ) : null}
-                  <FormField
+                <FormField
                     id="ca-name"
                     label="Assistant name"
                     error={errors.name?.message}
@@ -401,6 +373,35 @@ export function CreateAssistantForm({
                     )}
                   />
                 </div>
+
+                {isEdit ? (
+                  <FormField
+                    id="ca-active"
+                    label="Assistant status"
+                    error={errors.active?.message}
+                  >
+                    <Controller
+                      name="active"
+                      control={control}
+                      render={({ field }) => (
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id="ca-active"
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={pending}
+                            aria-invalid={!!errors.active}
+                          />
+                          <span className="text-muted-foreground text-sm">
+                            {field.value
+                              ? "Active — chat and talk are available"
+                              : "Inactive — conversations stay disabled"}
+                          </span>
+                        </div>
+                      )}
+                    />
+                  </FormField>
+                ) : null}
               </CardContent>
             </Card>
           </TabsContent>

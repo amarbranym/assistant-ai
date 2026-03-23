@@ -6,7 +6,6 @@ import { getSupabasePublicCredentials } from "./config";
 const PROTECTED_PREFIXES = ["/assistants", "/tools", "/analytics", "/settings"];
 
 function isProtectedPath(pathname: string): boolean {
-  if (pathname === "/") return true;
   return PROTECTED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );

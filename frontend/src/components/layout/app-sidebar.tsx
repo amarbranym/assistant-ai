@@ -4,15 +4,26 @@ import {
   BarChart3,
   Bot,
   LayoutDashboard,
+  LogOut,
   PlusCircle,
   Settings,
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
+import { useAuth } from "@/features/auth/context/auth-context";
+import { useAuthUser } from "@/features/auth/hooks/use-auth-user";
 import { cn } from "@/lib/utils";
 import { ASSISTANT_NEW_ROUTE } from "@/features/assistant/lib/constants";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { SIGN_IN_ROUTE } from "@/features/auth/lib/routes";
 
 type NavItem = {
   href: string;
@@ -109,6 +120,34 @@ function NavSection({
 }
 
 export function AppSidebar() {
+  const router = useRouter();
+  const { signOut } = useAuth();
+  const { data, isLoading } = useAuthUser();
+  const [signingOut, setSigningOut] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const name = data?.user.name?.trim() || "User";
+  const email = data?.user.email?.trim() || "";
+  const avatarUrl = data?.user.avatarUrl ?? null;
+  const initials = useMemo(() => {
+    const source = (data?.user.name || data?.user.email || "U").trim();
+    const parts = source.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "U";
+    if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  }, [data?.user.email, data?.user.name]);
+
+  async function onSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.push(SIGN_IN_ROUTE);
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   return (
     <aside
       className={cn(
@@ -138,6 +177,46 @@ export function AppSidebar() {
         />
 
         <NavSection title="Platform" items={platformNav} />
+      </div>
+
+      <div className="border-sidebar-border border-t p-2.5">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="bg-sidebar-accent/35 border-sidebar-border hover:bg-sidebar-accent/55 focus-visible:border-ring/60 focus-visible:ring-ring/35 data-popup-open:bg-sidebar-accent/55 flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            aria-label="Open profile menu"
+          >
+            <div className="bg-sidebar-primary/15 text-sidebar-primary relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-semibold">
+              {!imageFailed && avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={`${name} avatar`}
+                  className="size-full object-cover"
+                  onError={() => setImageFailed(true)}
+                />
+              ) : (
+                <span>{isLoading ? "…" : initials}</span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium leading-tight">
+                {isLoading ? "Loading profile..." : name}
+              </p>
+              <p className="text-muted-foreground truncate text-xs">
+                {isLoading ? "Loading email..." : (email || "No email")}
+              </p>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="min-w-48">
+            <DropdownMenuItem
+              onClick={() => void onSignOut()}
+              disabled={signingOut}
+              className="cursor-pointer"
+            >
+              <LogOut className="size-4" aria-hidden />
+              {signingOut ? "Logging out..." : "Logout"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   );

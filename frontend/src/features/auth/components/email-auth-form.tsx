@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +13,11 @@ import { Separator } from "@/components/ui/separator";
 import { DEFAULT_POST_AUTH_PATH } from "../constants";
 import { useEmailPasswordAuth } from "../hooks/use-email-password-auth";
 import { sanitizeReturnPath } from "../lib/return-path";
-import { SIGN_IN_ROUTE, SIGN_UP_ROUTE } from "../lib/routes";
+import {
+  FORGOT_PASSWORD_ROUTE,
+  SIGN_IN_ROUTE,
+  SIGN_UP_ROUTE,
+} from "../lib/routes";
 import { AuthFormLayout } from "./auth-form-layout";
 import { PasswordField } from "./password-field";
 import { SocialAuthButtons } from "./social-auth-buttons";
@@ -161,6 +166,17 @@ export function EmailAuthForm({ variant }: EmailAuthFormProps) {
               toggleAriaLabelWhenHidden="Show password"
               toggleAriaLabelWhenVisible="Hide password"
             />
+
+            {variant === "sign-in" ? (
+              <div className="flex justify-end">
+                <Link
+                  href={FORGOT_PASSWORD_ROUTE}
+                  className="text-primary text-xs underline-offset-4 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            ) : null}
 
             {variant === "sign-up" ? (
               <PasswordField

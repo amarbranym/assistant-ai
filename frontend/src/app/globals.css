@@ -307,6 +307,22 @@
       var(--shadow-spread) var(--shadow-color);
   }
 
+  .bg-grid-futuristic {
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--border) 50%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--border) 50%, transparent) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: radial-gradient(ellipse at center, black 45%, transparent 85%);
+  }
+
+  .aurora-orb {
+    animation: aurora-drift 12s ease-in-out infinite alternate;
+  }
+
+  .float-soft {
+    animation: float-soft 6s ease-in-out infinite;
+  }
+
   /**
    * Subtle focus for form controls — border shift + light ring (theme tokens only).
    * Use on inputs, textareas, selects, and combobox triggers.
@@ -318,5 +334,24 @@
   .focus-control:focus-visible {
     border-color: color-mix(in srgb, var(--ring) 42%, var(--border));
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--ring) 14%, transparent);
+  }
+}
+
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(22px, -18px, 0) scale(1.05);
+  }
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
   }
 }

@@ -6,7 +6,6 @@ export type {
   CreateAssistantPayload,
   UpdateAssistantPayload,
 } from "./types/api-assistant";
-export { MOCK_ASSISTANTS } from "./data/mock-assistants";
 export {
   useAssistantsQuery,
   useCreateAssistantMutation,

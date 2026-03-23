@@ -2,13 +2,27 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { ComponentProps } from "react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 import { useAuth } from "../context/auth-context";
 import { SIGN_IN_ROUTE } from "../lib/routes";
 
-export function SignOutButton() {
+type SignOutButtonProps = {
+  className?: string;
+  variant?: ComponentProps<typeof Button>["variant"];
+  size?: ComponentProps<typeof Button>["size"];
+  label?: string;
+};
+
+export function SignOutButton({
+  className,
+  variant = "outline",
+  size = "default",
+  label = "Sign out",
+}: SignOutButtonProps = {}) {
   const router = useRouter();
   const { signOut } = useAuth();
   const [pending, setPending] = useState(false);
@@ -27,12 +41,13 @@ export function SignOutButton() {
   return (
     <Button
       type="button"
-      variant="outline"
-      className="border-border"
+      variant={variant}
+      size={size}
+      className={cn("border-border", className)}
       disabled={pending}
       onClick={onSignOut}
     >
-      {pending ? "Signing out…" : "Sign out"}
+      {pending ? "Signing out…" : label}
     </Button>
   );
 }
