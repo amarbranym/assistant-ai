@@ -20,18 +20,20 @@ export function authMiddleware(
     return;
   }
 
-  try {
-    const payload = verifySupabaseAccessToken(token);
-    req.user = {
-      id: payload.sub,
-      email: payload.email || undefined,
-      name: payload.name
-    };
-  } catch {
-    // Invalid token — anonymous
-  }
-
-  next();
+  void verifySupabaseAccessToken(token)
+    .then((payload) => {
+      req.user = {
+        id: payload.sub,
+        email: payload.email || undefined,
+        name: payload.name
+      };
+    })
+    .catch(() => {
+      // Invalid token — anonymous
+    })
+    .finally(() => {
+      next();
+    });
 }
 
 export const requireAuth = requireAuthGuard;

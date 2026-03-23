@@ -1,10 +1,8 @@
-import type { AssistantConfig, AssistantConfigUpdate } from "./assistant.validation";
-
 export interface CreateAssistantDTO {
   name: string;
   description?: string;
   projectId?: string;
-  config?: AssistantConfig;
+  config?: Record<string, unknown>;
 }
 
 export interface UpdateAssistantDTO {
@@ -12,5 +10,5 @@ export interface UpdateAssistantDTO {
   description?: string;
   projectId?: string | null;
   active?: boolean;
-  config?: AssistantConfigUpdate;
+  config?: Record<string, unknown>;
 }

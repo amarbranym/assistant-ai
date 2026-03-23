@@ -10,7 +10,11 @@ const router = Router();
 
 const protectedChain = [authMiddleware, requireAuth, authRateLimit];
 
-router.post("/test/chat", asyncHandler(assistantController.testChatStream));
+router.post(
+  "/test/chat",
+  ...protectedChain,
+  asyncHandler(assistantController.testChatStream)
+);
 
 router.get("/", ...protectedChain, asyncHandler(assistantController.list));
 

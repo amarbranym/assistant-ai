@@ -16,6 +16,7 @@ model User {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   oauthAccounts     OAuthAccount[]
+  assistants        Assistant[]
 }
 
 model OAuthAccount {
@@ -40,6 +41,8 @@ model Project {
 
 model Assistant {
   id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectId   String?
   project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   name        String
@@ -52,6 +55,8 @@ model Assistant {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Call {
