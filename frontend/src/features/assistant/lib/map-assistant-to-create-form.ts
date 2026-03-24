@@ -65,6 +65,21 @@ export function mapAssistantRecordToFormValues(
       base.modelProvider = asModelProvider(model.provider);
     if (typeof model.model === "string" && model.model.length > 0)
       base.modelId = model.model;
+    if (typeof model.temperature === "number" && Number.isFinite(model.temperature))
+      base.temperature = model.temperature;
+    const messages = Array.isArray(model.messages) ? model.messages : null;
+    if (messages) {
+      const systemMessage = messages.find(
+        (m) =>
+          isRecord(m) &&
+          m.role === "system" &&
+          typeof m.content === "string" &&
+          m.content.length > 0
+      );
+      if (systemMessage && isRecord(systemMessage)) {
+        base.systemPrompt = systemMessage.content as string;
+      }
+    }
   }
 
   if (typeof c.firstMessageMode === "string")

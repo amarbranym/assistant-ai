@@ -4,7 +4,14 @@ export function mapCreateFormToConfig(
   v: CreateAssistantFormValues
 ): Record<string, unknown> {
   return {
-    model: { provider: v.modelProvider, model: v.modelId },
+    model: {
+      provider: v.modelProvider,
+      model: v.modelId,
+      temperature: v.temperature,
+      messages: v.systemPrompt?.trim()
+        ? [{ role: "system", content: v.systemPrompt.trim() }]
+        : [],
+    },
     voice: {
       provider: v.voiceProvider,
       model: v.voiceModel,
@@ -25,10 +32,8 @@ export function mapCreateFormToConfig(
     },
     tools: v.tools,
     advanced: v.advancedEntries.filter((e) => e.key.trim().length > 0),
-    systemPrompt: v.systemPrompt,
     firstMessageMode: v.firstMessageMode,
     firstMessage: v.firstMessage,
     maxTokens: v.maxTokens,
-    temperature: v.temperature,
   };
 }

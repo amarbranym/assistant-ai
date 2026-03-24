@@ -29,16 +29,71 @@ export const MODEL_PROVIDER_COMBO_OPTIONS: SearchableComboboxOption[] =
     label: modelProviderLabels[p],
   }));
 
-/** Combobox options for LLM model id. */
-export const MODEL_ID_COMBO_OPTIONS: SearchableComboboxOption[] = [
-  { value: "gpt-4.1", label: "GPT-4.1" },
-  { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
-  { value: "gpt-4o", label: "GPT-4o" },
-  { value: "o3-mini", label: "o3-mini" },
-  { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
-  { value: "claude-3-opus", label: "Claude 3 Opus" },
-  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-];
+const MODEL_ID_OPTIONS_BY_PROVIDER: Record<
+  (typeof MODEL_PROVIDERS)[number],
+  SearchableComboboxOption[]
+> = {
+  openai: [
+    { value: "gpt-5.4", label: "GPT-5.4 (Latest)" },
+    { value: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+    { value: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
+  
+    { value: "gpt-5.1", label: "GPT-5.1" },
+    { value: "gpt-5-mini", label: "GPT-5 Mini" },
+    { value: "gpt-5-nano", label: "GPT-5 Nano" },
+  
+    { value: "gpt-4.1", label: "GPT-4.1" },
+    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+    { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
+  
+    { value: "gpt-4o", label: "GPT-4o" },
+  
+    { value: "o3", label: "O3 (Reasoning)" },
+    { value: "o3-mini", label: "O3 Mini" },
+    { value: "o4-mini", label: "O4 Mini" }
+  ],
+  anthropic: [
+    { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
+    { value: "claude-3-opus", label: "Claude 3 Opus" },
+  ],
+  google: [  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+    { value: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
+  
+    { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
+  
+    { value: "gemini-3-pro", label: "Gemini 3 Pro" },
+    { value: "gemini-3-flash", label: "Gemini 3 Flash" },
+  
+    { value: "gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+    { value: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" }],
+  azure: [
+    { value: "gpt-4.1", label: "GPT-4.1 (Azure)" },
+    { value: "gpt-4o", label: "GPT-4o (Azure)" },
+  ],
+  other: [
+    { value: "custom-model", label: "Custom model" },
+    { value: "gpt-4.1", label: "GPT-4.1" },
+    { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
+    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  ],
+};
+
+/** Backward-compatible full list of model options. */
+export const MODEL_ID_COMBO_OPTIONS: SearchableComboboxOption[] = Array.from(
+  new Map(
+    Object.values(MODEL_ID_OPTIONS_BY_PROVIDER)
+      .flat()
+      .map((option) => [option.value, option] as const)
+  ).values()
+);
+
+export function getModelIdOptionsForProvider(
+  provider: (typeof MODEL_PROVIDERS)[number]
+): SearchableComboboxOption[] {
+  return MODEL_ID_OPTIONS_BY_PROVIDER[provider];
+}
 
 /** Combobox options for voice provider. */
 export const VOICE_PROVIDER_COMBO_OPTIONS: SearchableComboboxOption[] =

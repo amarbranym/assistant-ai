@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Bot, Mic, SlidersHorizontal, Wrench } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Controller,
   FormProvider,
@@ -40,9 +40,9 @@ import {
   useUpdateAssistantMutation,
 } from "@/features/assistant/hooks/use-assistants";
 import {
-  MODEL_ID_COMBO_OPTIONS,
   MODEL_PROVIDER_COMBO_OPTIONS,
   TOOL_LABELS,
+  getModelIdOptionsForProvider,
 } from "@/features/assistant/lib/wizard-model-options";
 import { AdvancedVoiceConfigurationSection } from "@/features/assistant/components/create-assistant/advanced-voice-configuration-section";
 import { VoiceConfigurationSection } from "@/features/assistant/components/create-assistant/voice-configuration-section";
@@ -120,6 +120,32 @@ export function CreateAssistantForm({
     control,
     name: "firstMessageMode",
   });
+  const selectedModelProvider = useWatch({
+    control,
+    name: "modelProvider",
+  });
+  const selectedModelId = useWatch({
+    control,
+    name: "modelId",
+  });
+
+  const modelOptions = useMemo(
+    () => getModelIdOptionsForProvider(selectedModelProvider),
+    [selectedModelProvider]
+  );
+
+  useEffect(() => {
+    const hasSelectedModel = modelOptions.some(
+      (option) => option.value === selectedModelId
+    );
+    if (hasSelectedModel) return;
+    const fallbackModel = modelOptions[0]?.value ?? "";
+    form.setValue("modelId", fallbackModel, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  }, [form, modelOptions, selectedModelId]);
 
   const [activeTab, setActiveTab] = useState<CreateAssistantTabValue>(
     CREATE_ASSISTANT_TABS[0].value,
@@ -259,7 +285,7 @@ export function CreateAssistantForm({
                       render={({ field }) => (
                         <SearchableCombobox
                           id="ca-model-id"
-                          options={MODEL_ID_COMBO_OPTIONS}
+                          options={modelOptions}
                           value={field.value}
                           onChange={field.onChange}
                           placeholder="Select model"
