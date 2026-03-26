@@ -4,12 +4,15 @@ import { useChat } from "@ai-sdk/react";
 import { Bot, Loader2, SendHorizontal, Square } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { UIMessage } from "ai";
+import { DefaultChatTransport } from "ai";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { env } from "@/config/env";
+import { getAccessToken } from "@/features/auth/lib/auth-storage";
+import { getApiBaseUrl } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
-import { createSimulatedChatTransport } from "../lib/simulated-chat-transport";
 import type { AssistantRecord } from "../types/api-assistant";
 
 function messageText(m: UIMessage): string {
@@ -24,16 +27,48 @@ type AssistantChatPanelProps = {
 };
 
 export function AssistantChatPanel({ assistant }: AssistantChatPanelProps) {
-  const transport = useMemo(
-    () => createSimulatedChatTransport({ assistantName: assistant.name }),
-    [assistant.name]
-  );
+  const [conversationId, setConversationId] = useState<string | undefined>();
+
+  const transport = useMemo(() => {
+    return new DefaultChatTransport<UIMessage>({
+      api: `${getApiBaseUrl()}/api/v1/chat/stream`,
+      credentials: "omit",
+      headers: async () => {
+        const headers: Record<string, string> = {};
+        const token = getAccessToken();
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const key = env.NEXT_PUBLIC_API_KEY;
+        if (key) headers["x-api-key"] = key;
+        return headers;
+      },
+      body: () => ({}),
+      prepareSendMessagesRequest: ({ body, id, messages, trigger, messageId }) => {
+        return {
+          body: {
+            ...body,
+            assistantId: assistant.id,
+            ...(conversationId ? { conversationId } : {}),
+            id,
+            messages,
+            trigger,
+            ...(messageId ? { messageId } : {}),
+          },
+        };
+      },
+      fetch: async (input, init) => {
+        const res = await fetch(input, init);
+        const cid = res.headers.get("x-conversation-id");
+        if (cid) setConversationId(cid);
+        return res;
+      },
+    });
+  }, [assistant.id, conversationId]);
 
   const initialMessages = useMemo<UIMessage[]>(() => {
     const desc = assistant.description?.trim();
     const opener = desc
-      ? `Hi — I'm ${assistant.name}. ${desc}\n\nReplies here are simulated until you plug in a real model.`
-      : `Hi — I'm ${assistant.name}. How can I help you today?\n\nReplies here are simulated until you plug in a real model.`;
+      ? `Hi — I'm ${assistant.name}. ${desc}`
+      : `Hi — I'm ${assistant.name}. How can I help you today?`;
 
     return [
       {
@@ -41,31 +76,13 @@ export function AssistantChatPanel({ assistant }: AssistantChatPanelProps) {
         role: "assistant",
         parts: [{ type: "text", text: opener, state: "done" }],
       },
-      {
-        id: `${assistant.id}-seed-u1`,
-        role: "user",
-        parts: [
-          { type: "text", text: "What can you help me with?", state: "done" },
-        ],
-      },
-      {
-        id: `${assistant.id}-seed-a2`,
-        role: "assistant",
-        parts: [
-          {
-            type: "text",
-            text: "I can brainstorm, summarize, draft messages, and more once your API is connected. Send anything below — you'll get a streaming mock reply.",
-            state: "done",
-          },
-        ],
-      },
     ];
   }, [assistant.description, assistant.id, assistant.name]);
 
   const { messages, sendMessage, status, stop, error } = useChat({
     id: `assistant-drawer-${assistant.id}`,
-    transport,
     messages: initialMessages,
+    transport,
   });
 
   const [input, setInput] = useState("");

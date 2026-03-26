@@ -1,6 +1,7 @@
 import { getPrismaClient } from "../../lib/prismaClient";
 import type { CreateAssistantDTO, UpdateAssistantDTO } from "./assistant.types";
 import { Prisma } from "@prisma/client";
+import type { Role } from "@prisma/client";
 
 const prisma = getPrismaClient();
 
@@ -114,7 +115,7 @@ export async function saveMessage({
   content
 }: {
   conversationId: string;
-  role: "system" | "user" | "assistant" | "tool" | "data";
+  role: Role;
   content: string;
 }) {
   return prisma.message.create({

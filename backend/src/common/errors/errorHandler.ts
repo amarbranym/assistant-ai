@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { ErrorRequestHandler } from "express";
 import { logger } from "../../config/logger";
+import { isDev } from "../../config/env";
 import { AppError } from "./AppError";
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
@@ -12,6 +13,17 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
         message:
           "Database is unreachable. Check DATABASE_URL in .env, that the database is running (e.g. Supabase project not paused), and try the Supabase pooler URL (port 6543) if direct port 5432 is blocked.",
         code: "DATABASE_UNAVAILABLE"
+      }
+    });
+  }
+
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    logger.error({ err }, "Prisma request error");
+    return res.status(500).json({
+      success: false,
+      error: {
+        message: isDev ? err.message : "Internal server error",
+        code: err.code
       }
     });
   }

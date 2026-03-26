@@ -39,8 +39,7 @@ export function AssistantChatDrawer({
           <SheetTitle>Chat · {name}</SheetTitle>
           <SheetDescription>
             Powered by AI SDK{" "}
-            <span className="text-foreground/80 font-mono">useChat</span> with a
-            simulated stream (no backend yet).
+            <span className="text-foreground/80 font-mono">useChat</span>.
           </SheetDescription>
         </SheetHeader>
         {assistant ? (
