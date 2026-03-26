@@ -81,12 +81,21 @@ export function resolveLlmConfigFromAssistantConfig(
   const maxOutputTokens =
     modelCfg?.maxOutputTokens ?? DEFAULTS.maxOutputTokens;
 
+  // Also support legacy/top-level maxTokens (frontend stores `config.maxTokens`).
+  const legacyMaxTokens =
+    parsed.success && typeof (parsed.data as Record<string, unknown>).maxTokens === "number"
+      ? Number((parsed.data as Record<string, unknown>).maxTokens)
+      : undefined;
+
   return {
     provider,
     model,
     systemPrompt,
     temperature,
-    maxOutputTokens,
+    maxOutputTokens:
+      legacyMaxTokens && Number.isFinite(legacyMaxTokens) && legacyMaxTokens > 0
+        ? Math.min(Math.floor(legacyMaxTokens), 32768)
+        : maxOutputTokens,
     ...(options?.tools ? { tools: options.tools } : {})
   };
 }

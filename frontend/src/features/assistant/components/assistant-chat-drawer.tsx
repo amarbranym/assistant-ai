@@ -34,7 +34,7 @@ export function AssistantChatDrawer({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="flex h-full max-h-dvh flex-col gap-0 p-0">
+      <SheetContent className="flex h-dvh max-h-dvh flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         <SheetHeader className="border-border shrink-0 border-b px-4 py-3">
           <SheetTitle>Chat · {name}</SheetTitle>
           <SheetDescription>
