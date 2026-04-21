@@ -21,8 +21,12 @@ function buildAuthHeaders(skipAuth?: boolean): HeadersInit {
   const headers: Record<string, string> = {};
   const token = getAccessToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  // `NEXT_PUBLIC_API_KEY` is public by definition and is not verified on the
+  // backend; we only forward it when the operator has explicitly set it to a
+  // non-default value (to support a future gateway). The placeholder "dev"
+  // is treated as unset so we don't leak a fake credential.
   const key = env.NEXT_PUBLIC_API_KEY;
-  if (key) headers["x-api-key"] = key;
+  if (key && key !== "dev") headers["x-api-key"] = key;
   return headers;
 }
 

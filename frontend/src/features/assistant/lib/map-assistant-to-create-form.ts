@@ -3,7 +3,6 @@ import {
   MODEL_PROVIDERS,
   STREAMING_LATENCY_MODES,
   TOOL_IDS,
-  VOICE_PROVIDERS,
   type CreateAssistantFormValues,
   defaultCreateAssistantFormValues,
   type FirstMessageMode,
@@ -21,13 +20,6 @@ function asModelProvider(
   return (MODEL_PROVIDERS as readonly string[]).includes(v)
     ? (v as CreateAssistantFormValues["modelProvider"])
     : defaultCreateAssistantFormValues.modelProvider;
-}
-
-function asVoiceProvider(v: string): CreateAssistantFormValues["voiceProvider"] {
-  const normalized = v === "11labs" ? "elevenlabs" : v;
-  return (VOICE_PROVIDERS as readonly string[]).includes(normalized)
-    ? (normalized as CreateAssistantFormValues["voiceProvider"])
-    : defaultCreateAssistantFormValues.voiceProvider;
 }
 
 function asFirstMessageMode(v: string): FirstMessageMode {
@@ -58,6 +50,41 @@ export function mapAssistantRecordToFormValues(
   base.active = record.active;
 
   const c = isRecord(record.config) ? record.config : {};
+  const channels = isRecord(c.channels) ? c.channels : null;
+  if (channels) {
+    const phone = isRecord(channels.phone) ? channels.phone : null;
+    const whatsapp = isRecord(channels.whatsapp) ? channels.whatsapp : null;
+    if (phone && typeof phone.enabled === "boolean") {
+      base.channelsPhoneEnabled = phone.enabled;
+    }
+    if (whatsapp && typeof whatsapp.enabled === "boolean") {
+      base.channelsWhatsappEnabled = whatsapp.enabled;
+    }
+    const twilio = phone && isRecord(phone.twilio) ? phone.twilio : null;
+    if (twilio && typeof twilio.phoneNumber === "string") {
+      base.channelsTwilioPhoneNumber = twilio.phoneNumber;
+    } else if (phone && typeof phone.number === "string") {
+      base.channelsTwilioPhoneNumber = phone.number;
+    }
+    if (twilio && typeof twilio.accountSid === "string") {
+      base.channelsTwilioAccountSid = twilio.accountSid;
+    }
+    if (twilio && typeof twilio.authToken === "string") {
+      base.channelsTwilioAuthToken = twilio.authToken;
+    }
+    if (twilio && typeof twilio.label === "string") {
+      base.channelsTwilioLabel = twilio.label;
+    }
+    if (twilio && typeof twilio.smsEnabled === "boolean") {
+      base.channelsTwilioSmsEnabled = twilio.smsEnabled;
+    }
+    if (whatsapp && typeof whatsapp.number === "string") {
+      base.channelsWhatsappNumber = whatsapp.number;
+    }
+    if (whatsapp && typeof whatsapp.businessName === "string") {
+      base.channelsWhatsappBusinessName = whatsapp.businessName;
+    }
+  }
 
   const model = isRecord(c.model) ? c.model : null;
   if (model) {
@@ -93,10 +120,6 @@ export function mapAssistantRecordToFormValues(
 
   const voice = isRecord(c.voice) ? c.voice : null;
   if (voice) {
-    if (typeof voice.provider === "string")
-      base.voiceProvider = asVoiceProvider(voice.provider);
-    if (typeof voice.model === "string" && voice.model.length > 0)
-      base.voiceModel = voice.model;
     if (typeof voice.voiceCatalogId === "string")
       base.voiceCatalogId = voice.voiceCatalogId;
     if (typeof voice.voiceManualId === "string")
@@ -149,6 +172,99 @@ export function mapAssistantRecordToFormValues(
         base.tools[id] = tools[id] as boolean;
       }
     }
+    const customApi = isRecord(tools.custom_api) ? tools.custom_api : null;
+    if (customApi) {
+      base.tools.custom_api = true;
+      if (typeof customApi.url === "string") base.customApiUrl = customApi.url;
+      if (customApi.method === "GET" || customApi.method === "POST") {
+        base.customApiMethod = customApi.method;
+      }
+      if (Array.isArray(customApi.requiredFields)) {
+        base.customApiRequiredFields = customApi.requiredFields
+          .filter((x): x is string => typeof x === "string")
+          .join(",");
+      }
+      if (isRecord(customApi.headers)) {
+        base.customApiHeaders = Object.entries(customApi.headers)
+          .slice(0, 20)
+          .map(([key, value]) => ({
+            key,
+            value: typeof value === "string" ? value : JSON.stringify(value)
+          }));
+      }
+    }
+  }
+  const integrations = isRecord(c.integrations) ? c.integrations : null;
+  if (integrations && Array.isArray(integrations.linkedTools)) {
+    base.linkedToolIds = integrations.linkedTools.filter(
+      (x): x is string => typeof x === "string"
+    );
+  }
+  if (integrations && Array.isArray(integrations.toolConfigs)) {
+    base.assistantToolConfigs = integrations.toolConfigs
+      .filter(isRecord)
+      .map((t) => {
+        const provider: "hubspot" | "telecrm" | "custom" =
+          t.provider === "hubspot" || t.provider === "telecrm" || t.provider === "custom"
+            ? t.provider
+            : "custom";
+        const authType: "none" | "api_key" | "bearer" =
+          t.authType === "none" || t.authType === "api_key" || t.authType === "bearer"
+            ? t.authType
+            : "none";
+        return {
+          toolId: typeof t.toolId === "string" ? t.toolId : "",
+          name: typeof t.name === "string" ? t.name : "Tool",
+          provider,
+          enabled: typeof t.enabled === "boolean" ? t.enabled : true,
+          endpointUrl: typeof t.endpointUrl === "string" ? t.endpointUrl : "",
+          authType,
+          authValue: typeof t.authValue === "string" ? t.authValue : "",
+          params: Array.isArray(t.params)
+            ? t.params
+                .filter(isRecord)
+                .map((p) => ({
+                  id: typeof p.id === "string" ? p.id : crypto.randomUUID(),
+                  key: typeof p.key === "string" ? p.key : "",
+                  value: typeof p.value === "string" ? p.value : "",
+                  required: typeof p.required === "boolean" ? p.required : false
+                }))
+            : [],
+          headers: Array.isArray(t.headers)
+            ? t.headers
+                .filter(isRecord)
+                .map((p) => ({
+                  id: typeof p.id === "string" ? p.id : crypto.randomUUID(),
+                  key: typeof p.key === "string" ? p.key : "",
+                  value: typeof p.value === "string" ? p.value : "",
+                  required: typeof p.required === "boolean" ? p.required : false
+                }))
+            : []
+        };
+      })
+      .filter((x) => x.toolId);
+  }
+
+  const knowledge = isRecord(c.knowledge) ? c.knowledge : null;
+  if (knowledge && Array.isArray(knowledge.sources)) {
+    base.knowledgeSources = knowledge.sources
+      .filter(isRecord)
+      .map((s) => ({
+        id: typeof s.id === "string" ? s.id : crypto.randomUUID(),
+        type:
+          s.type === "url" || s.type === "text" || s.type === "file"
+            ? s.type
+            : "text",
+        name: typeof s.name === "string" ? s.name : "Untitled source",
+        content: typeof s.content === "string" ? s.content : "",
+        enabled: typeof s.enabled === "boolean" ? s.enabled : true,
+        status:
+          s.status === "processing" || s.status === "ready" || s.status === "failed"
+            ? s.status
+            : "ready",
+        lastUpdatedAt:
+          typeof s.lastUpdatedAt === "string" ? s.lastUpdatedAt : undefined,
+      }));
   }
 
   const advanced = c.advanced;

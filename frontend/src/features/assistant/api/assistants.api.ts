@@ -1,6 +1,7 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
   AssistantRecord,
+  AssistantPublishReadiness,
   CreateAssistantPayload,
   UpdateAssistantPayload,
 } from "../types/api-assistant";
@@ -85,4 +86,27 @@ export async function deleteAssistant(id: string): Promise<void> {
   await apiRequest<null>(`${ASSISTANTS_PATH}/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
+}
+
+export async function fetchAssistantPublishReadiness(
+  id: string
+): Promise<AssistantPublishReadiness> {
+  return apiRequest<AssistantPublishReadiness>(
+    `${ASSISTANTS_PATH}/${encodeURIComponent(id)}/publish/readiness`,
+    { method: "GET" }
+  );
+}
+
+export async function publishAssistant(id: string): Promise<AssistantRecord> {
+  const row = await apiRequest<unknown>(`${ASSISTANTS_PATH}/${encodeURIComponent(id)}/publish`, {
+    method: "POST"
+  });
+  return mapAssistantRow(row);
+}
+
+export async function unpublishAssistant(id: string): Promise<AssistantRecord> {
+  const row = await apiRequest<unknown>(`${ASSISTANTS_PATH}/${encodeURIComponent(id)}/unpublish`, {
+    method: "POST"
+  });
+  return mapAssistantRow(row);
 }

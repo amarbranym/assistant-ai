@@ -26,7 +26,7 @@ export default function RootLayout({
       lang="en"
       className={`${sourceCodePro.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">
+      <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

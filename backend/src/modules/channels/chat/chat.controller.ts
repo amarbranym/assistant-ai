@@ -26,6 +26,7 @@ export async function stream(req: RequestWithUser, res: Response, _next: NextFun
     input: body.input,
     messages: body.messages
   });
+  const mode = body.mode === "live" ? "live" : "test";
 
   if (!userText || !userText.trim()) {
     throw new AppError(400, "Missing input", "INVALID_BODY");
@@ -45,10 +46,12 @@ export async function stream(req: RequestWithUser, res: Response, _next: NextFun
     assistant,
     conversationId: conversation.id,
     userText,
-    abortSignal: abortController.signal
+    abortSignal: abortController.signal,
+    mode
   });
 
   res.setHeader("x-conversation-id", conversation.id);
+  res.setHeader("x-runtime-mode", mode);
 
   // Stream UI message chunks (what DefaultChatTransport / useChat expects).
   const originalMessages = Array.isArray(body.messages)

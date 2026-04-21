@@ -14,6 +14,8 @@ export const chatStreamSchema = z.object({
    * If present, `assistantId` and `conversationId` can also be provided here.
    */
   data: z.unknown().optional()
+  ,
+  mode: z.enum(["test", "live"]).optional()
 }).passthrough();
 
 export type ChatStreamBody = z.infer<typeof chatStreamSchema>;

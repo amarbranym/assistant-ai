@@ -4,26 +4,31 @@ import { logger } from "../../config/logger";
 import { isDev } from "../../config/env";
 import { AppError } from "./AppError";
 
-export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
+  const requestId = req.requestId;
+  const log = req.log ?? logger;
+
   if (err instanceof Prisma.PrismaClientInitializationError) {
-    logger.error({ err }, "Database unavailable");
+    log.error({ err }, "Database unavailable");
     return res.status(503).json({
       success: false,
       error: {
         message:
           "Database is unreachable. Check DATABASE_URL in .env, that the database is running (e.g. Supabase project not paused), and try the Supabase pooler URL (port 6543) if direct port 5432 is blocked.",
-        code: "DATABASE_UNAVAILABLE"
+        code: "DATABASE_UNAVAILABLE",
+        requestId
       }
     });
   }
 
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    logger.error({ err }, "Prisma request error");
+    log.error({ err }, "Prisma request error");
     return res.status(500).json({
       success: false,
       error: {
         message: isDev ? err.message : "Internal server error",
-        code: err.code
+        code: err.code,
+        requestId
       }
     });
   }
@@ -36,9 +41,9 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
       : 500;
 
   if (status >= 500) {
-    logger.error({ err }, "Unhandled error");
+    log.error({ err }, "Unhandled error");
   } else {
-    logger.warn({ err }, "Request error");
+    log.warn({ err }, "Request error");
   }
 
   const message =
@@ -55,7 +60,8 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     success: false,
     error: {
       message,
-      code
+      code,
+      requestId
     }
   });
 };

@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   Bot,
   ChevronDown,
-  Loader2,
   RotateCcw,
   SendHorizontal,
   Square,
@@ -22,6 +21,8 @@ import { getApiBaseUrl } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 import type { AssistantRecord } from "../types/api-assistant";
+import { useAssistantVoiceSession } from "../hooks/use-assistant-voice-session";
+import { useAssistantRuntimeMode } from "../hooks/use-assistant-runtime-mode";
 
 function messageText(m: UIMessage): string {
   return m.parts
@@ -40,6 +41,7 @@ function clamp(n: number, min: number, max: number) {
 
 export function AssistantChatPanel({ assistant }: AssistantChatPanelProps) {
   const [conversationId, setConversationId] = useState<string | undefined>();
+  const { mode, setMode } = useAssistantRuntimeMode(assistant.id);
 
   const transport = useMemo(() => {
     return new DefaultChatTransport<UIMessage>({
@@ -64,6 +66,7 @@ export function AssistantChatPanel({ assistant }: AssistantChatPanelProps) {
             messages,
             trigger,
             ...(messageId ? { messageId } : {}),
+            mode,
           },
         };
       },
@@ -74,7 +77,7 @@ export function AssistantChatPanel({ assistant }: AssistantChatPanelProps) {
         return res;
       },
     });
-  }, [assistant.id, conversationId]);
+  }, [assistant.id, conversationId, mode]);
 
   const initialMessages = useMemo<UIMessage[]>(() => {
     const desc = assistant.description?.trim();
@@ -103,6 +106,12 @@ export function AssistantChatPanel({ assistant }: AssistantChatPanelProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
   const busy = status === "submitted" || status === "streaming";
+  const voice = useAssistantVoiceSession({
+    assistantId: assistant.id,
+    mode,
+    conversationId,
+    onConversationId: setConversationId
+  });
 
   const scrollToBottom = (behavior: ScrollBehavior) => {
     const el = listRef.current;
@@ -156,6 +165,42 @@ export function AssistantChatPanel({ assistant }: AssistantChatPanelProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-linear-to-b from-muted/30 to-background">
       <div className="relative flex min-h-0 flex-1 flex-col">
+        {voice.callActive && voice.micMuted ? (
+          <div className="mb-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            Voice call is active but the microphone is muted. Unmute in the voice panel to send audio — no STT or reply
+            will run until audio reaches the server.
+          </div>
+        ) : null}
+        {voice.partialTranscript ? (
+          <div className="text-muted-foreground bg-muted/40 mb-2 rounded-lg px-3 py-2 text-xs">
+            Listening: {voice.partialTranscript}
+          </div>
+        ) : null}
+        <div className="mb-2 flex items-center gap-2 px-4">
+          <Button
+            type="button"
+            size="sm"
+            variant={mode === "test" ? "default" : "outline"}
+            onClick={() => setMode("test")}
+          >
+            Test Mode
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={mode === "live" ? "default" : "outline"}
+            onClick={() => setMode("live")}
+          >
+            Live Mode
+          </Button>
+        </div>
+
+        {voice.error ? (
+          <div className="border-destructive/30 bg-destructive/5 text-destructive mb-2 rounded-lg border px-3 py-2 text-xs">
+            Voice error: {voice.error}
+          </div>
+        ) : null}
+
         <div
           ref={listRef}
           onScroll={handleScroll}

@@ -1,5 +1,6 @@
-import { PlaceholderPage } from "@/components/dashboard/placeholder-page";
+"use client";
 
 export default function AnalyticsPage() {
-  return <PlaceholderPage title="Analytics" />;
+  const { AnalyticsOverviewView } = require("@/features/analytics/views/analytics-overview-view");
+  return <AnalyticsOverviewView />;
 }

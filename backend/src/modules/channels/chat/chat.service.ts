@@ -3,6 +3,9 @@ import type { Tool, ModelMessage } from "ai";
 
 import { AppError } from "../../../common/errors/AppError";
 import { getPrismaClient } from "../../../lib/prismaClient";
+import { getEnabledTools } from "../../assistant/tools.registry";
+import { buildCustomApiTool } from "../../assistant/custom-api.tool";
+import { buildManagedIntegrationTools } from "../../assistant/managed-tools.tool";
 import {
   resolveLlmConfigFromAssistantConfig,
   streamTextResponseSafe
@@ -11,8 +14,28 @@ import { buildRuntimeSystemPrompt } from "../../llm/prompt.builder";
 
 const prisma = getPrismaClient();
 
+type KnowledgeSource = {
+  id: string;
+  type: "url" | "text" | "file";
+  name: string;
+  content?: string;
+  enabled: boolean;
+  status: "processing" | "ready" | "failed";
+};
+
 function asTextContent(content: unknown): string | undefined {
   return typeof content === "string" ? content : undefined;
+}
+
+function toolsFromConfig(config: Record<string, unknown>): string[] {
+  const raw = config.tools;
+  if (Array.isArray(raw)) return raw.filter((x): x is string => typeof x === "string");
+  if (raw && typeof raw === "object") {
+    return Object.entries(raw as Record<string, unknown>)
+      .filter(([, v]) => v === true)
+      .map(([k]) => k);
+  }
+  return [];
 }
 
 function extractLastUserTextFromUiMessages(messages: unknown): string | undefined {
@@ -109,12 +132,50 @@ export async function streamAssistantReply(input: {
   userText: string;
   abortSignal?: AbortSignal;
   tools?: Record<string, Tool>;
+  mode?: "test" | "live";
 }) {
+  if (input.mode === "live" && !input.assistant.active) {
+    throw new AppError(403, "Assistant is inactive. Enable it before using live mode.", "ASSISTANT_INACTIVE");
+  }
+
   const history = await getConversationHistory(input.conversationId, 20);
 
-  const config = resolveLlmConfigFromAssistantConfig(input.assistant.config, {
-    tools: input.tools
+  const assistantConfig = (input.assistant.config ?? {}) as Record<string, unknown>;
+  const mode = input.mode === "live" ? "live" : "test";
+  const enabledPredefinedTools = mode === "live" ? getEnabledTools(toolsFromConfig(assistantConfig)) : {};
+  const managedTools = buildManagedIntegrationTools({
+    assistant: input.assistant,
+    conversationId: input.conversationId,
+    mode
   });
+  const customApiTool = buildCustomApiTool({
+    assistant: input.assistant,
+    conversationId: input.conversationId,
+    mode
+  });
+  const runtimeTools: Record<string, Tool> = {
+    ...enabledPredefinedTools,
+    ...managedTools,
+    ...(customApiTool ? { custom_api: customApiTool } : {}),
+    ...(input.tools ?? {})
+  };
+  const config = resolveLlmConfigFromAssistantConfig(assistantConfig, {
+    tools: mode === "live" ? runtimeTools : undefined
+  });
+  const knowledgeSources = readKnowledgeSources(assistantConfig).filter(
+    (s) => s.enabled && s.status === "ready" && s.content?.trim()
+  );
+  const knowledgeContext =
+    knowledgeSources.length > 0
+      ? `\n\nKnowledge context:\n${knowledgeSources
+          .slice(0, 8)
+          .map((s) => `- ${s.name}: ${(s.content ?? "").slice(0, 600)}`)
+          .join("\n")}`
+      : "";
+  const modeInstruction =
+    mode === "live"
+      ? "\n\nRuntime mode: LIVE. If actions/tools are configured, they may execute for real users."
+      : "\n\nRuntime mode: TEST. Do not claim real-world actions were completed; clearly simulate tool outcomes when uncertain.";
 
   const hasPriorAssistantTurn = history.some((m) => m.role === "assistant");
   const recentUserText = [
@@ -151,7 +212,7 @@ export async function streamAssistantReply(input: {
   const runtimeSystemPrompt = buildRuntimeSystemPrompt({
     assistantName: input.assistant.name,
     assistantDescription: input.assistant.description ?? null,
-    baseSystemPrompt: config.systemPrompt,
+    baseSystemPrompt: `${config.systemPrompt}${knowledgeContext}${modeInstruction}`,
     channel: "chat",
     hasPriorAssistantTurn,
     knownContext,
@@ -172,6 +233,10 @@ export async function streamAssistantReply(input: {
 
   await saveUserMessage(input.conversationId, input.userText);
 
+  if (knowledgeSources.length > 0) {
+    incrementKnowledgeUsage(input.assistant, knowledgeSources.length).catch(() => {});
+  }
+
   let didPersistAssistant = false;
 
   const result = await streamTextResponseSafe({
@@ -188,6 +253,59 @@ export async function streamAssistantReply(input: {
   });
 
   return { result };
+}
+
+function readKnowledgeSources(config: Record<string, unknown>): KnowledgeSource[] {
+  const knowledge =
+    config.knowledge && typeof config.knowledge === "object"
+      ? (config.knowledge as Record<string, unknown>)
+      : {};
+  const sources = Array.isArray(knowledge.sources) ? knowledge.sources : [];
+  return sources
+    .filter((s): s is Record<string, unknown> => Boolean(s && typeof s === "object"))
+    .map((s) => ({
+      id: typeof s.id === "string" ? s.id : "",
+      type: s.type === "url" || s.type === "text" || s.type === "file" ? s.type : "text",
+      name: typeof s.name === "string" ? s.name : "Untitled",
+      content: typeof s.content === "string" ? s.content : undefined,
+      enabled: typeof s.enabled === "boolean" ? s.enabled : true,
+      status:
+        s.status === "processing" || s.status === "ready" || s.status === "failed"
+          ? s.status
+          : "ready"
+    }));
+}
+
+async function incrementKnowledgeUsage(assistant: Assistant, sourceCount: number) {
+  const config = (assistant.config ?? {}) as Record<string, unknown>;
+  const analytics =
+    config.analytics && typeof config.analytics === "object"
+      ? (config.analytics as Record<string, unknown>)
+      : {};
+  const knowledge =
+    analytics.knowledge && typeof analytics.knowledge === "object"
+      ? (analytics.knowledge as Record<string, unknown>)
+      : {};
+  const totalHits = typeof knowledge.totalHits === "number" ? knowledge.totalHits : 0;
+  const lastSourceCountUsed =
+    typeof knowledge.lastSourceCountUsed === "number" ? knowledge.lastSourceCountUsed : 0;
+  await prisma.assistant.update({
+    where: { id: assistant.id },
+    data: {
+      config: {
+        ...config,
+        analytics: {
+          ...analytics,
+          knowledge: {
+            ...knowledge,
+            totalHits: totalHits + 1,
+            lastSourceCountUsed: sourceCount || lastSourceCountUsed,
+            lastUsedAt: new Date().toISOString()
+          }
+        }
+      }
+    }
+  });
 }
 
 function inferKnownContext(allUserText: string): Record<string, string | boolean> {

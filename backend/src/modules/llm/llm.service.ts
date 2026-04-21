@@ -3,14 +3,18 @@ import {
   AISDKError,
   LoadAPIKeyError,
   NoSuchModelError,
+  stepCountIs,
   streamText,
   type ModelMessage
 } from "ai";
 import { z } from "zod";
 
 import { AppError } from "../../common/errors/AppError";
+import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import type { LlmProvider, LlmProviderName, LlmResolvedConfig, LlmStreamRequest } from "./llm.types";
 import { createGoogleProvider } from "./providers/google.provider";
+import { createGroqProvider } from "./providers/groq.provider";
 import { createOpenAIProvider } from "./providers/openai.provider";
 
 const DEFAULTS: Omit<LlmResolvedConfig, "tools"> = {
@@ -21,11 +25,88 @@ const DEFAULTS: Omit<LlmResolvedConfig, "tools"> = {
   maxOutputTokens: 1024
 };
 
+/** Fallback Gemini model when auto-switching from OpenAI → Google. */
+const GOOGLE_FALLBACK_MODEL = "gemini-2.5-flash";
+
+/** Fallback Groq model when auto-switching to Groq. */
+const GROQ_FALLBACK_MODEL = "llama-3.3-70b-versatile";
+
+/**
+ * List of OpenAI model IDs the frontend exposes that don't actually exist
+ * (future/placeholder names). Treat as aliases so we still produce a reply
+ * instead of spamming NO_SUCH_MODEL / invalid_request_error.
+ */
+const OPENAI_MODEL_ALIASES: Record<string, string> = {
+  "gpt-5.4": "gpt-4o",
+  "gpt-5.4-mini": "gpt-4o-mini",
+  "gpt-5.4-nano": "gpt-4o-mini",
+  "gpt-5.1": "gpt-4o",
+  "gpt-5-mini": "gpt-4o-mini",
+  "gpt-5-nano": "gpt-4o-mini",
+  "gpt-5": "gpt-4o"
+};
+
+/**
+ * Returns a `{ provider, model }` pair guaranteed to have its API key present.
+ * Order of preference:
+ *   1. The provider the user configured (if its key is set).
+ *   2. Google (if GOOGLE_GENERATIVE_AI_API_KEY is set) — falls back to Gemini.
+ *   3. OpenAI (if OPENAI_API_KEY is set).
+ *   4. Groq (if GROQ_API_KEY is set).
+ *   5. As-configured (will fail with a clear AppError downstream).
+ */
+function pickAvailableProvider(
+  wantedProvider: LlmProviderName,
+  wantedModel: string
+): { provider: LlmProviderName; model: string } {
+  const hasOpenAI = Boolean(env.providers.openaiApiKey);
+  const hasGoogle = Boolean(env.providers.googleGenerativeAiApiKey);
+  const hasGroq = Boolean(env.providers.groqApiKey);
+
+  const resolvedModel =
+    wantedProvider === "openai" && OPENAI_MODEL_ALIASES[wantedModel]
+      ? OPENAI_MODEL_ALIASES[wantedModel]
+      : wantedModel;
+
+  if (wantedProvider === "openai" && hasOpenAI) {
+    return { provider: "openai", model: resolvedModel };
+  }
+  if (wantedProvider === "google" && hasGoogle) {
+    return { provider: "google", model: wantedModel };
+  }
+  if (wantedProvider === "groq" && hasGroq) {
+    return { provider: "groq", model: wantedModel };
+  }
+
+  if (hasGoogle) {
+    logger.warn(
+      { wantedProvider, wantedModel, fallback: `google:${GOOGLE_FALLBACK_MODEL}` },
+      "LLM: requested provider key missing, falling back to Google Gemini"
+    );
+    return { provider: "google", model: GOOGLE_FALLBACK_MODEL };
+  }
+  if (hasOpenAI) {
+    logger.warn(
+      { wantedProvider, wantedModel, fallback: `openai:${resolvedModel || DEFAULTS.model}` },
+      "LLM: requested provider key missing, falling back to OpenAI"
+    );
+    return { provider: "openai", model: resolvedModel || DEFAULTS.model };
+  }
+  if (hasGroq) {
+    logger.warn(
+      { wantedProvider, wantedModel, fallback: `groq:${GROQ_FALLBACK_MODEL}` },
+      "LLM: requested provider key missing, falling back to Groq"
+    );
+    return { provider: "groq", model: GROQ_FALLBACK_MODEL };
+  }
+  return { provider: wantedProvider, model: resolvedModel };
+}
+
 const assistantConfigSchema = z
   .object({
     model: z
       .object({
-        provider: z.enum(["openai", "google"]).optional(),
+        provider: z.enum(["openai", "google", "groq"]).optional(),
         model: z.string().min(1).optional(),
         systemPrompt: z.string().min(1).optional(),
         temperature: z.number().min(0).max(2).optional(),
@@ -52,7 +133,8 @@ function extractSystemPromptFromModelMessages(messages: unknown): string | undef
 function getProviderRegistry(): Record<LlmProviderName, LlmProvider> {
   return {
     openai: createOpenAIProvider(),
-    google: createGoogleProvider()
+    google: createGoogleProvider(),
+    groq: createGroqProvider()
   };
 }
 
@@ -64,8 +146,9 @@ export function resolveLlmConfigFromAssistantConfig(
 
   const modelCfg = parsed.success ? parsed.data.model : undefined;
 
-  const provider = modelCfg?.provider ?? DEFAULTS.provider;
-  const model = modelCfg?.model ?? DEFAULTS.model;
+  const wantedProvider: LlmProviderName = modelCfg?.provider ?? DEFAULTS.provider;
+  const wantedModel = modelCfg?.model ?? DEFAULTS.model;
+  const { provider, model } = pickAvailableProvider(wantedProvider, wantedModel);
 
   const systemPromptFromMessages = extractSystemPromptFromModelMessages(
     modelCfg && typeof modelCfg === "object" ? (modelCfg as Record<string, unknown>).messages : undefined
@@ -173,6 +256,8 @@ export function streamTextResponse(req: LlmStreamRequest) {
     messages: req.messages
   });
 
+  const toolEntries = req.config.tools ? Object.keys(req.config.tools).length : 0;
+
   try {
     return streamText({
       model,
@@ -180,6 +265,7 @@ export function streamTextResponse(req: LlmStreamRequest) {
       temperature: req.config.temperature,
       maxOutputTokens: req.config.maxOutputTokens,
       ...(req.config.tools ? { tools: req.config.tools } : {}),
+      ...(toolEntries > 0 ? { stopWhen: stepCountIs(12) } : {}),
       ...(req.abortSignal ? { abortSignal: req.abortSignal } : {}),
       ...(req.onFinish
         ? {

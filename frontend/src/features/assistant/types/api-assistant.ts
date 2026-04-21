@@ -12,6 +12,18 @@ export type AssistantRecord = {
   updatedAt: string;
 };
 
+export type AssistantPublishReadiness = {
+  assistantId: string;
+  status: "draft" | "published";
+  canPublish: boolean;
+  checks: Array<{
+    key: string;
+    label: string;
+    passed: boolean;
+    message: string;
+  }>;
+};
+
 export type CreateAssistantPayload = {
   name: string;
   description?: string;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AssistantChatView } from "@/features/assistant/components/assistant-chat-view";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,16 +15,14 @@ export default async function AssistantChatPage({ params }: PageProps) {
     <div className="border-border bg-background flex min-h-0 flex-1 flex-col border-b px-5 py-6 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-muted-foreground font-mono text-[0.65rem] uppercase tracking-widest">
+          <p className="text-muted-foreground text-[0.65rem] uppercase tracking-widest">
             Chat
           </p>
-          <h1 className="font-heading text-foreground mt-1 text-lg font-semibold">
+          <h1 className="text-foreground mt-1 text-lg font-semibold">
             Conversation
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Placeholder — connect your chat UI and realtime channel here. Assistant
-            id:{" "}
-            <code className="text-foreground font-mono text-xs">{id}</code>
+            Test your assistant with live streaming responses before publishing.
           </p>
         </div>
         <Link
@@ -33,9 +32,7 @@ export default async function AssistantChatPage({ params }: PageProps) {
           Back to assistants
         </Link>
       </div>
-      <div className="border-border bg-muted/20 text-muted-foreground flex flex-1 items-center justify-center rounded-lg border border-dashed p-8 text-sm">
-        Chat transcript will appear here.
-      </div>
+      <AssistantChatView assistantId={id} />
     </div>
   );
 }

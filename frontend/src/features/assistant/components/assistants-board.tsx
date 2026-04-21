@@ -31,10 +31,16 @@ import { ASSISTANT_NEW_ROUTE, assistantEditRoute } from "../lib/constants";
 import {
   useAssistantsQuery,
   useDeleteAssistantMutation,
+  useAssistantPublishReadinessQuery,
+  usePublishAssistantMutation,
+  useUnpublishAssistantMutation,
 } from "../hooks/use-assistants";
 import type { AssistantRecord } from "../types/api-assistant";
 import { AssistantCard } from "./assistant-card";
-import { AssistantChatDrawer } from "./assistant-chat-drawer";
+import {
+  AssistantChatDrawer,
+  type AssistantDrawerMode,
+} from "./assistant-chat-drawer";
 
 function AssistantsLoadingSkeleton() {
   return (
@@ -84,16 +90,30 @@ export function AssistantsBoard() {
     error,
   } = useAssistantsQuery();
   const deleteMutation = useDeleteAssistantMutation();
+  const publishMutation = usePublishAssistantMutation();
+  const unpublishMutation = useUnpublishAssistantMutation();
 
   const [deleteTarget, setDeleteTarget] = useState<AssistantRecord | null>(
     null
   );
-  const [chatAssistant, setChatAssistant] = useState<AssistantRecord | null>(
+  const [drawerAssistant, setDrawerAssistant] = useState<AssistantRecord | null>(
     null
+  );
+  const [publishTarget, setPublishTarget] = useState<AssistantRecord | null>(null);
+  const [drawerMode, setDrawerMode] = useState<AssistantDrawerMode>("chat");
+  const publishReadiness = useAssistantPublishReadinessQuery(
+    publishTarget?.id ?? "",
+    Boolean(publishTarget)
   );
 
   const openChatDrawer = useCallback((a: AssistantRecord) => {
-    setChatAssistant(a);
+    setDrawerMode("chat");
+    setDrawerAssistant(a);
+  }, []);
+
+  const openVoiceDrawer = useCallback((a: AssistantRecord) => {
+    setDrawerMode("voice");
+    setDrawerAssistant(a);
   }, []);
 
   const goToEdit = useCallback(
@@ -113,6 +133,26 @@ export function AssistantsBoard() {
     }
   }
 
+  async function confirmPublishToggle() {
+    if (!publishTarget) return;
+    const config =
+      publishTarget.config && typeof publishTarget.config === "object"
+        ? (publishTarget.config as Record<string, unknown>)
+        : {};
+    const deployment =
+      config.deployment && typeof config.deployment === "object"
+        ? (config.deployment as Record<string, unknown>)
+        : {};
+    const isPublished = deployment.status === "published";
+    if (isPublished) {
+      await unpublishMutation.mutateAsync(publishTarget.id);
+      setPublishTarget(null);
+      return;
+    }
+    await publishMutation.mutateAsync(publishTarget.id);
+    setPublishTarget(null);
+  }
+
   const listError =
     isError && error instanceof Error ? error.message : "Failed to load assistants.";
 
@@ -130,7 +170,7 @@ export function AssistantsBoard() {
     <div className="flex min-h-0 flex-1 flex-col overflow-auto">
       <DashboardPageHeader
         title="Assistants"
-        description="Create and manage voice assistants. Local data for now — API wiring next."
+        description="Create, test, and manage assistants across chat and live voice."
         actions={newAssistantLink}
       />
 
@@ -168,7 +208,9 @@ export function AssistantsBoard() {
                   formattedUpdated={formatDateTime(a.updatedAt)}
                   onEdit={goToEdit}
                   onDelete={setDeleteTarget}
+                  onTogglePublish={setPublishTarget}
                   onChat={openChatDrawer}
+                  onTalk={openVoiceDrawer}
                 />
               </li>
             ))}
@@ -177,10 +219,11 @@ export function AssistantsBoard() {
       </div>
 
       <AssistantChatDrawer
-        assistant={chatAssistant}
-        open={chatAssistant !== null}
+        assistant={drawerAssistant}
+        mode={drawerMode}
+        open={drawerAssistant !== null}
         onOpenChange={(next) => {
-          if (!next) setChatAssistant(null);
+          if (!next) setDrawerAssistant(null);
         }}
       />
 
@@ -219,6 +262,78 @@ export function AssistantsBoard() {
               }}
             >
               {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!publishTarget}
+        onOpenChange={(open) => !open && setPublishTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader className="place-items-start text-left">
+            <AlertDialogTitle>Publish status</AlertDialogTitle>
+            <AlertDialogDescription>
+              Review deployment readiness before publishing this assistant.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {publishReadiness.isPending ? (
+            <p className="text-sm text-muted-foreground">Checking readiness…</p>
+          ) : publishReadiness.isError ? (
+            <p className="text-sm text-destructive">
+              {publishReadiness.error instanceof Error
+                ? publishReadiness.error.message
+                : "Could not load readiness checks."}
+            </p>
+          ) : publishReadiness.data ? (
+            <div className="space-y-2">
+              {publishReadiness.data.checks.map((check) => (
+                <div key={check.key} className="rounded-md border px-3 py-2">
+                  <p className="text-sm font-medium">
+                    {check.label} {check.passed ? "✓" : "✕"}
+                  </p>
+                  {!check.passed ? (
+                    <p className="text-xs text-destructive">{check.message}</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {(publishMutation.isError || unpublishMutation.isError) ? (
+            <p className="text-destructive text-sm" role="alert">
+              {publishMutation.error instanceof Error
+                ? publishMutation.error.message
+                : unpublishMutation.error instanceof Error
+                  ? unpublishMutation.error.message
+                  : "Could not update publish status."}
+            </p>
+          ) : null}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={publishMutation.isPending || unpublishMutation.isPending}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={
+                publishMutation.isPending ||
+                unpublishMutation.isPending ||
+                (publishReadiness.data?.status !== "published" && !publishReadiness.data?.canPublish)
+              }
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmPublishToggle();
+              }}
+            >
+              {publishMutation.isPending || unpublishMutation.isPending
+                ? "Updating…"
+                : publishReadiness.data?.status === "published"
+                  ? "Unpublish"
+                  : "Publish"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

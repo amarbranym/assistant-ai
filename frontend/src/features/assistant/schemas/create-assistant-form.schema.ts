@@ -2,17 +2,10 @@ import { z } from "zod";
 
 export const MODEL_PROVIDERS = [
   "openai",
+  "groq",
   "anthropic",
   "google",
   "azure",
-  "other",
-] as const;
-
-export const VOICE_PROVIDERS = [
-  "elevenlabs",
-  "openai",
-  "azure",
-  "google",
   "other",
 ] as const;
 
@@ -71,6 +64,40 @@ const advancedEntrySchema = z.object({
   value: z.string(),
 });
 
+const knowledgeSourceSchema = z.object({
+  id: z.string(),
+  type: z.enum(["url", "text", "file"]),
+  name: z.string().min(1),
+  content: z.string().optional(),
+  enabled: z.boolean(),
+  status: z.enum(["processing", "ready", "failed"]),
+  lastUpdatedAt: z.string().optional(),
+});
+
+const headerEntrySchema = z.object({
+  key: z.string(),
+  value: z.string(),
+});
+
+const assistantToolParamSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  value: z.string(),
+  required: z.boolean(),
+});
+
+const assistantToolConfigSchema = z.object({
+  toolId: z.string(),
+  name: z.string(),
+  provider: z.enum(["hubspot", "telecrm", "custom"]),
+  enabled: z.boolean(),
+  endpointUrl: z.string(),
+  authType: z.enum(["none", "api_key", "bearer"]),
+  authValue: z.string(),
+  params: z.array(assistantToolParamSchema),
+  headers: z.array(assistantToolParamSchema),
+});
+
 export const STREAMING_LATENCY_MODES = ["off", "balanced", "aggressive"] as const;
 
 export type StreamingLatencyMode = (typeof STREAMING_LATENCY_MODES)[number];
@@ -80,6 +107,15 @@ export const createAssistantFormSchema = z.object({
   description: z.string().optional(),
   /** Shown on full editor (edit page); always true for new assistants from the form. */
   active: z.boolean(),
+  channelsPhoneEnabled: z.boolean(),
+  channelsWhatsappEnabled: z.boolean(),
+  channelsTwilioPhoneNumber: z.string().optional(),
+  channelsTwilioAccountSid: z.string().optional(),
+  channelsTwilioAuthToken: z.string().optional(),
+  channelsTwilioLabel: z.string().optional(),
+  channelsTwilioSmsEnabled: z.boolean(),
+  channelsWhatsappNumber: z.string().optional(),
+  channelsWhatsappBusinessName: z.string().optional(),
   modelProvider: z.enum(MODEL_PROVIDERS),
   modelId: z.string().min(1, "Select a model"),
   firstMessageMode: z.enum(FIRST_MESSAGE_MODES),
@@ -87,8 +123,6 @@ export const createAssistantFormSchema = z.object({
   systemPrompt: z.string().optional(),
   maxTokens: z.coerce.number().min(256).max(200000),
   temperature: z.coerce.number().min(0).max(2),
-  voiceProvider: z.enum(VOICE_PROVIDERS),
-  voiceModel: z.string().min(1, "Voice model is required"),
   useVoiceIdManually: z.boolean(),
   voiceCatalogId: z.string().min(1, "Select a voice"),
   voiceManualId: z.string().optional(),
@@ -103,6 +137,13 @@ export const createAssistantFormSchema = z.object({
   optimizeStreamingLatency: z.enum(STREAMING_LATENCY_MODES),
   useSpeakerBoost: z.boolean(),
   voiceAutoMode: z.boolean(),
+  knowledgeSources: z.array(knowledgeSourceSchema),
+  customApiUrl: z.string().optional(),
+  customApiMethod: z.enum(["POST", "GET"]),
+  customApiRequiredFields: z.string(),
+  customApiHeaders: z.array(headerEntrySchema),
+  linkedToolIds: z.array(z.string()),
+  assistantToolConfigs: z.array(assistantToolConfigSchema),
   tools: toolsSchema,
   advancedEntries: z.array(advancedEntrySchema),
 }).superRefine((data, ctx) => {
@@ -113,6 +154,43 @@ export const createAssistantFormSchema = z.object({
       path: ["voiceManualId"],
     });
   }
+  if (data.channelsPhoneEnabled && !data.channelsTwilioPhoneNumber?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Phone number is required when Phone channel is enabled",
+      path: ["channelsTwilioPhoneNumber"],
+    });
+  }
+  if (data.channelsPhoneEnabled && !data.channelsTwilioAccountSid?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Twilio Account SID is required when Phone channel is enabled",
+      path: ["channelsTwilioAccountSid"],
+    });
+  }
+  if (data.channelsPhoneEnabled && !data.channelsTwilioAuthToken?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Twilio Auth Token is required when Phone channel is enabled",
+      path: ["channelsTwilioAuthToken"],
+    });
+  }
+  if (data.channelsWhatsappEnabled && !data.channelsWhatsappNumber?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      message: "WhatsApp number is required when WhatsApp channel is enabled",
+      path: ["channelsWhatsappNumber"],
+    });
+  }
+  if (data.tools.custom_api) {
+    if (!data.customApiUrl?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Custom API URL is required when Custom API is enabled",
+        path: ["customApiUrl"],
+      });
+    }
+  }
 });
 
 export type CreateAssistantFormValues = z.infer<typeof createAssistantFormSchema>;
@@ -121,6 +199,15 @@ export const defaultCreateAssistantFormValues: CreateAssistantFormValues = {
   name: "",
   description: "",
   active: true,
+  channelsPhoneEnabled: true,
+  channelsWhatsappEnabled: true,
+  channelsTwilioPhoneNumber: "",
+  channelsTwilioAccountSid: "",
+  channelsTwilioAuthToken: "",
+  channelsTwilioLabel: "",
+  channelsTwilioSmsEnabled: false,
+  channelsWhatsappNumber: "",
+  channelsWhatsappBusinessName: "",
   modelProvider: "openai",
   modelId: "gpt-4.1",
   firstMessageMode: "user_first",
@@ -128,8 +215,6 @@ export const defaultCreateAssistantFormValues: CreateAssistantFormValues = {
   systemPrompt: "",
   maxTokens: 4096,
   temperature: 0.7,
-  voiceProvider: "elevenlabs",
-  voiceModel: "eleven_turbo_v2_5",
   useVoiceIdManually: false,
   voiceCatalogId: "voice_rachel",
   voiceManualId: "",
@@ -144,6 +229,13 @@ export const defaultCreateAssistantFormValues: CreateAssistantFormValues = {
   optimizeStreamingLatency: "balanced",
   useSpeakerBoost: true,
   voiceAutoMode: false,
+  knowledgeSources: [],
+  customApiUrl: "",
+  customApiMethod: "POST",
+  customApiRequiredFields: "name,email,phone",
+  customApiHeaders: [],
+  linkedToolIds: [],
+  assistantToolConfigs: [],
   tools: TOOL_IDS.reduce(
     (acc, id) => {
       acc[id] = false;

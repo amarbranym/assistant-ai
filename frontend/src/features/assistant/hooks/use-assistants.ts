@@ -10,7 +10,10 @@ import {
   createAssistant,
   deleteAssistant,
   fetchAssistant,
+  fetchAssistantPublishReadiness,
   fetchAssistants,
+  publishAssistant,
+  unpublishAssistant,
   updateAssistant,
 } from "../api/assistants.api";
 import { assistantsQueryKeys } from "../api/assistants-query-keys";
@@ -31,6 +34,14 @@ export function useAssistantQuery(id: string) {
     queryKey: assistantsQueryKeys.detail(id),
     queryFn: () => fetchAssistant(id),
     enabled: Boolean(id),
+  });
+}
+
+export function useAssistantPublishReadinessQuery(id: string, enabled = true) {
+  return useQuery({
+    queryKey: [...assistantsQueryKeys.detail(id), "publish-readiness"],
+    queryFn: () => fetchAssistantPublishReadiness(id),
+    enabled: Boolean(id) && enabled
   });
 }
 
@@ -70,5 +81,27 @@ export function useDeleteAssistantMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: assistantsQueryKeys.all });
     },
+  });
+}
+
+export function usePublishAssistantMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => publishAssistant(id),
+    onSuccess: (_data, id) => {
+      void qc.invalidateQueries({ queryKey: assistantsQueryKeys.all });
+      void qc.invalidateQueries({ queryKey: assistantsQueryKeys.detail(id) });
+    }
+  });
+}
+
+export function useUnpublishAssistantMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unpublishAssistant(id),
+    onSuccess: (_data, id) => {
+      void qc.invalidateQueries({ queryKey: assistantsQueryKeys.all });
+      void qc.invalidateQueries({ queryKey: assistantsQueryKeys.detail(id) });
+    }
   });
 }

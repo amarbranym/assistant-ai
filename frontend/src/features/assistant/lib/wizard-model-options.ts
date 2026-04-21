@@ -2,23 +2,15 @@ import type { SearchableComboboxOption } from "@/components/ui/searchable-combob
 
 import {
   MODEL_PROVIDERS,
-  VOICE_PROVIDERS,
   type StreamingLatencyMode,
 } from "../schemas/create-assistant-form.schema";
 
 const modelProviderLabels: Record<(typeof MODEL_PROVIDERS)[number], string> = {
   openai: "OpenAI",
+  groq: "Groq",
   anthropic: "Anthropic",
   google: "Google",
   azure: "Azure",
-  other: "Other",
-};
-
-const voiceProviderLabels: Record<(typeof VOICE_PROVIDERS)[number], string> = {
-  elevenlabs: "ElevenLabs",
-  openai: "OpenAI",
-  azure: "Azure",
-  google: "Google",
   other: "Other",
 };
 
@@ -34,23 +26,22 @@ const MODEL_ID_OPTIONS_BY_PROVIDER: Record<
   SearchableComboboxOption[]
 > = {
   openai: [
-    { value: "gpt-5.4", label: "GPT-5.4 (Latest)" },
-    { value: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
-    { value: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
-  
-    { value: "gpt-5.1", label: "GPT-5.1" },
-    { value: "gpt-5-mini", label: "GPT-5 Mini" },
-    { value: "gpt-5-nano", label: "GPT-5 Nano" },
-  
+    { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o Mini (fast)" },
+
     { value: "gpt-4.1", label: "GPT-4.1" },
     { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
     { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
-  
-    { value: "gpt-4o", label: "GPT-4o" },
-  
-    { value: "o3", label: "O3 (Reasoning)" },
-    { value: "o3-mini", label: "O3 Mini" },
-    { value: "o4-mini", label: "O4 Mini" }
+
+    { value: "o3-mini", label: "O3 Mini (reasoning)" },
+    { value: "o4-mini", label: "O4 Mini (reasoning)" }
+  ],
+  groq: [
+    { value: "llama-3.3-70b-versatile", label: "Llama 3.3 70B Versatile" },
+    { value: "llama-3.1-8b-instant", label: "Llama 3.1 8B Instant" },
+    { value: "llama-3.1-70b-versatile", label: "Llama 3.1 70B Versatile" },
+    { value: "mixtral-8x7b-32768", label: "Mixtral 8x7B" },
+    { value: "gemma2-9b-it", label: "Gemma 2 9B IT" },
   ],
   anthropic: [
     { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
@@ -94,22 +85,6 @@ export function getModelIdOptionsForProvider(
 ): SearchableComboboxOption[] {
   return MODEL_ID_OPTIONS_BY_PROVIDER[provider];
 }
-
-/** Combobox options for voice provider. */
-export const VOICE_PROVIDER_COMBO_OPTIONS: SearchableComboboxOption[] =
-  VOICE_PROVIDERS.map((p) => ({
-    value: p,
-    label: voiceProviderLabels[p],
-  }));
-
-/** Combobox options for voice model. */
-export const VOICE_MODEL_COMBO_OPTIONS: SearchableComboboxOption[] = [
-  { value: "eleven_turbo_v2_5", label: "Eleven Turbo v2.5" },
-  { value: "eleven_multilingual_v2", label: "Eleven Multilingual v2" },
-  { value: "tts-1", label: "OpenAI TTS-1" },
-  { value: "tts-1-hd", label: "OpenAI TTS-1 HD" },
-  { value: "azure-neural", label: "Azure Neural" },
-];
 
 /** Mock catalog voices (searchable combobox). */
 export const VOICE_CATALOG_COMBO_OPTIONS: SearchableComboboxOption[] = [

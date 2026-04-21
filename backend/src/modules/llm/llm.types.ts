@@ -1,6 +1,6 @@
 import type { LanguageModel, ModelMessage, Tool } from "ai";
 
-export type LlmProviderName = "openai" | "google";
+export type LlmProviderName = "openai" | "google" | "groq";
 
 export type LlmResolvedConfig = {
   provider: LlmProviderName;

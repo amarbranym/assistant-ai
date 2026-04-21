@@ -27,6 +27,48 @@ router.post(
 
 router.get("/:id", ...protectedChain, asyncHandler(assistantController.getById));
 
+router.get(
+  "/:id/knowledge",
+  ...protectedChain,
+  asyncHandler(assistantController.listKnowledgeSources)
+);
+router.post(
+  "/:id/knowledge",
+  ...protectedChain,
+  asyncHandler(assistantController.addKnowledgeSource)
+);
+router.patch(
+  "/:id/knowledge/:sourceId",
+  ...protectedChain,
+  asyncHandler(assistantController.updateKnowledgeSource)
+);
+router.post(
+  "/:id/knowledge/:sourceId/refresh",
+  ...protectedChain,
+  asyncHandler(assistantController.refreshKnowledgeSource)
+);
+router.delete(
+  "/:id/knowledge/:sourceId",
+  ...protectedChain,
+  asyncHandler(assistantController.removeKnowledgeSource)
+);
+
+router.get(
+  "/:id/publish/readiness",
+  ...protectedChain,
+  asyncHandler(assistantController.publishReadiness)
+);
+router.post(
+  "/:id/publish",
+  ...protectedChain,
+  asyncHandler(assistantController.publish)
+);
+router.post(
+  "/:id/unpublish",
+  ...protectedChain,
+  asyncHandler(assistantController.unpublish)
+);
+
 router.put(
   "/:id",
   ...protectedChain,

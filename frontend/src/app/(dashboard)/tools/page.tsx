@@ -1,5 +1,5 @@
-import { PlaceholderPage } from "@/components/dashboard/placeholder-page";
+import { ToolsBuilderView } from "@/features/tools/views/tools-builder-view";
 
 export default function ToolsPage() {
-  return <PlaceholderPage title="Tools" />;
+  return <ToolsBuilderView />;
 }

@@ -67,15 +67,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function syncFromSession() {
-      const {
-        data: { session },
-      } = await supabaseClient.auth.getSession();
-      if (cancelled) return;
-      persistAccessTokenFromSession(session);
-      startTransition(() => {
-        setUser(authUserFromSession(session));
-        setStatus("ready");
-      });
+      try {
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession();
+        if (cancelled) return;
+        persistAccessTokenFromSession(session);
+        startTransition(() => {
+          setUser(authUserFromSession(session));
+          setStatus("ready");
+        });
+      } catch (err) {
+        // Expected in React strict mode: auth lock can be stolen when a
+        // second effect run supersedes the first (`Lock "..." was released`).
+        // We also swallow offline/Supabase-unreachable `TypeError: Failed to fetch`
+        // here so we don't crash the dev overlay on a flaky connection.
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        const isLockHandoff =
+          msg.includes("was released because another request stole it") ||
+          msg.includes("orphaned lock");
+        const isNetwork = msg.toLowerCase().includes("failed to fetch");
+        if (!isLockHandoff && !isNetwork && process.env.NODE_ENV !== "production") {
+          console.warn("Auth: initial session sync failed:", err);
+        }
+        startTransition(() => {
+          setStatus("ready");
+        });
+      }
     }
 
     void syncFromSession();
