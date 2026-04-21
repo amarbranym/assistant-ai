@@ -1,50 +1,33 @@
-import { z } from "zod";
-import { tool } from "ai";
+/**
+ * Backward-compatible entry for platform tool registration.
+ * Prefer importing from `./tooling/platform-tools.registry` in new code.
+ */
 
-const getWeather = tool({
-  description: "Get the current weather for a specific location.",
-  parameters: z.object({
-    location: z
-      .string()
-      .describe("The city and state, e.g. San Francisco, CA"),
-    unit: z.enum(["celsius", "fahrenheit"]).optional().default("fahrenheit")
-  }),
-  // @ts-expect-error — ai-sdk `tool()` execute overloads vary by version
-  execute: async ({ location, unit }) => {
-    return `The weather in ${location} is currently 72 degrees ${unit}.`;
-  }
-});
+import type { Tool } from "ai";
 
-const getCurrentTime = tool({
-  description: "Get the current date and time.",
-  parameters: z.object({
-    timezone: z
-      .string()
-      .optional()
-      .describe("Optional timezone; otherwise UTC is used.")
-  }),
-  // @ts-expect-error — ai-sdk `tool()` execute overloads vary by version
-  execute: async ({ timezone }) => {
-    return new Date().toLocaleString("en-US", { timeZone: timezone || "UTC" });
-  }
-});
+import type { PlatformToolId } from "./tooling/platform-tools.registry";
+import {
+  getPlatformTool,
+  getEnabledPlatformTools,
+  isPlatformToolId,
+  platformToolManifestEntry,
+  PLATFORM_TOOL_IDS
+} from "./tooling/platform-tools.registry";
 
-export const predefinedTools = {
-  getWeather,
-  getCurrentTime
+export {
+  PLATFORM_TOOL_IDS,
+  getEnabledPlatformTools as getEnabledTools,
+  getPlatformTool,
+  isPlatformToolId,
+  platformToolManifestEntry
 };
 
-export type AvailableTools = keyof typeof predefinedTools;
+export type { PlatformToolId };
 
-export function getEnabledTools(toolNames: string[]) {
-  const toolsToProvide: Record<string, (typeof predefinedTools)[AvailableTools]> =
-    {};
+/** @deprecated Use PlatformToolId */
+export type AvailableTools = PlatformToolId;
 
-  for (const tName of toolNames) {
-    if (tName in predefinedTools) {
-      toolsToProvide[tName] = predefinedTools[tName as AvailableTools];
-    }
-  }
-
-  return toolsToProvide;
-}
+export const predefinedTools: Record<PlatformToolId, Tool> = {
+  getWeather: getPlatformTool("getWeather"),
+  getCurrentTime: getPlatformTool("getCurrentTime")
+};

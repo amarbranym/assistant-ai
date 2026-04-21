@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Assistant } from "@prisma/client";
 
 import { AppError } from "../../common/errors/AppError";
+import type { RuntimeToolManifestEntry } from "./tooling/assistant-tools.types";
 import { safeFetch } from "../../common/http/safe-fetch";
 import { logger } from "../../config/logger";
 import { getPrismaClient } from "../../lib/prismaClient";
@@ -104,14 +105,20 @@ function headersFromConfig(config: ManagedToolConfig): Record<string, string> {
   return base;
 }
 
-export function buildManagedIntegrationTools(input: {
+type ManagedBuildResult = {
+  tools: Record<string, Tool>;
+  manifest: RuntimeToolManifestEntry[];
+};
+
+function buildManagedIntegrationToolsInternal(input: {
   assistant: Assistant;
   conversationId: string;
   mode: "test" | "live";
-}): Record<string, Tool> {
+}): ManagedBuildResult {
   const configs = readManagedToolConfigs(input.assistant);
-  if (configs.length === 0) return {};
+  if (configs.length === 0) return { tools: {}, manifest: [] };
   const out: Record<string, Tool> = {};
+  const manifest: RuntimeToolManifestEntry[] = [];
   const used = new Set<string>();
 
   for (const cfg of configs) {
@@ -123,6 +130,15 @@ export function buildManagedIntegrationTools(input: {
         acc[p.key] = p.value;
         return acc;
       }, {});
+
+    manifest.push({
+      kind: "managed",
+      id: toolKey,
+      label: cfg.name,
+      usageSummary:
+        `Integration “${cfg.name}”. Use when the user’s request matches this workflow. ` +
+        "Ask for one missing required field at a time; never invent field values."
+    });
 
     out[toolKey] = tool({
       description: `Execute "${cfg.name}" integration. Ask for one missing required field at a time before execution.`,
@@ -213,5 +229,21 @@ export function buildManagedIntegrationTools(input: {
     });
   }
 
-  return out;
+  return { tools: out, manifest };
+}
+
+export function buildManagedIntegrationTools(input: {
+  assistant: Assistant;
+  conversationId: string;
+  mode: "test" | "live";
+}): Record<string, Tool> {
+  return buildManagedIntegrationToolsInternal(input).tools;
+}
+
+export function buildManagedIntegrationToolsWithManifest(input: {
+  assistant: Assistant;
+  conversationId: string;
+  mode: "test" | "live";
+}): ManagedBuildResult {
+  return buildManagedIntegrationToolsInternal(input);
 }

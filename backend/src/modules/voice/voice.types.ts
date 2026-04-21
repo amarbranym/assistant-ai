@@ -49,6 +49,8 @@ export type VoiceResolvedConfig = {
   voiceSimilarityBoost: number;
   voiceSpeed: number;
   useSpeakerBoost: boolean;
+  /** If true, speaking user audio can auto-interrupt assistant playback. */
+  autoBargeIn: boolean;
 };
 
 export type VoiceSessionState = {

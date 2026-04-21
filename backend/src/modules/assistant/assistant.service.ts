@@ -10,11 +10,15 @@ import {
   updateAssistant as updateRepo
 } from "./assistant.repository";
 import type { CreateAssistantDTO, UpdateAssistantDTO } from "./assistant.types";
-import { getEnabledTools } from "./tools.registry";
-import { buildCustomApiTool } from "./custom-api.tool";
-import { buildManagedIntegrationTools } from "./managed-tools.tool";
 import { resolveLlmConfigFromAssistantConfig, streamTextResponseSafe } from "../llm/llm.service";
-import { buildRuntimeSystemPrompt } from "../llm/prompt.builder";
+import {
+  findConflictingNames,
+  inferIntentShiftNote,
+  inferKnownContext,
+  planNextQuestion
+} from "../llm/conversation-prompt-signals";
+import { buildLayeredSystemPrompt } from "../llm/prompt.builder";
+import { resolveAssistantRuntimeTools } from "./tooling/resolve-runtime-tools";
 import type { Role } from "@prisma/client";
 import { AppError } from "../../common/errors/AppError";
 
@@ -46,17 +50,6 @@ function deriveKnowledgeStatus(source: KnowledgeSource): "ready" | "failed" {
     }
   }
   return content.length > 0 ? "ready" : "failed";
-}
-
-function toolsFromConfig(config: Record<string, unknown>): string[] {
-  const raw = config.tools;
-  if (Array.isArray(raw)) return raw.filter((x): x is string => typeof x === "string");
-  if (raw && typeof raw === "object") {
-    return Object.entries(raw as Record<string, unknown>)
-      .filter(([, v]) => v === true)
-      .map(([k]) => k);
-  }
-  return [];
 }
 
 function readKnowledgeSources(config: Record<string, unknown>): KnowledgeSource[] {
@@ -151,50 +144,62 @@ export async function processChat({
   );
   const knowledgeContext =
     knowledgeSources.length > 0
-      ? `\n\nKnowledge context:\n${knowledgeSources
+      ? knowledgeSources
           .slice(0, 8)
           .map((s) => `- ${s.name}: ${(s.content ?? "").slice(0, 600)}`)
-          .join("\n")}`
-      : "";
-  const enabled = mode === "live" ? getEnabledTools(toolsFromConfig(config)) : undefined;
-  const customApi = buildCustomApiTool({ assistant, conversationId, mode });
-  const managedTools = buildManagedIntegrationTools({ assistant, conversationId, mode });
-  const tools = {
-    ...(enabled ?? {}),
-    ...managedTools,
-    ...(customApi ? { custom_api: customApi } : {})
-  };
+          .join("\n")
+      : undefined;
+  const { tools: runtimeTools, manifest: toolManifest } = resolveAssistantRuntimeTools(assistant, {
+    assistantConfig: config,
+    conversationId,
+    mode
+  });
   const history = await getRecentMessages({ conversationId, limit: 10 });
 
   const hasPriorAssistantTurn = history.some((m) => m.role === "assistant");
-  const llmConfig = resolveLlmConfigFromAssistantConfig(config, { tools });
+  const llmConfig = resolveLlmConfigFromAssistantConfig(config, { tools: runtimeTools });
+  const priorAssistantText = history
+    .filter((m) => m.role === "assistant")
+    .map((m) => m.content)
+    .join("\n");
   const conflictingNames = findConflictingNames({
     assistantName: assistant.name,
-    text: llmConfig.systemPrompt
+    text: `${llmConfig.systemPrompt}\n${priorAssistantText}`
   });
+  const recentUserText = [
+    ...history.filter((m) => m.role === "user").map((m) => m.content),
+    input
+  ]
+    .filter((s) => typeof s === "string" && s.trim().length > 0)
+    .slice(-10)
+    .join("\n");
+  const knownContext = inferKnownContext(recentUserText);
+  const intentShiftNote = inferIntentShiftNote(history, input);
+  const plannedNextQuestion = planNextQuestion(knownContext, input);
   const bannedPhrases = hasPriorAssistantTurn
     ? [
         "Thank you for calling",
         "This is",
         `This is ${assistant.name}`,
+        `This is ${assistant.name},`,
         ...conflictingNames.map((n) => `This is ${n}`),
         ...conflictingNames
       ]
     : [];
-  const plannedNextQuestion = undefined;
-  const runtimeSystemPrompt = buildRuntimeSystemPrompt({
+  const runtimeSystemPrompt = buildLayeredSystemPrompt({
     assistantName: assistant.name,
     assistantDescription: assistant.description ?? null,
-    baseSystemPrompt: `${llmConfig.systemPrompt}${knowledgeContext}${
-      mode === "live"
-        ? "\n\nRuntime mode: LIVE. Actions may execute for real users."
-        : "\n\nRuntime mode: TEST. Never claim that tools/actions were actually executed in external systems."
-    }`,
+    userSystemPrompt: llmConfig.systemPrompt,
+    knowledgeContext,
     channel: "chat",
     hasPriorAssistantTurn,
+    knownContext,
     bannedPhrases,
     plannedNextQuestion,
-    conflictingNames
+    intentShiftNote,
+    conflictingNames,
+    runtimeMode: mode,
+    enabledToolsManifest: toolManifest
   });
 
   const messages: ModelMessage[] = [
@@ -491,24 +496,4 @@ async function resolveKnowledgeStatus(input: { assistantId: string; userId: stri
   await updateRepo(input.assistantId, input.userId, {
     config: withKnowledgeSources(config, next)
   });
-}
-
-function findConflictingNames(input: { assistantName: string; text: string }): string[] {
-  const assistantLower = input.assistantName.trim().toLowerCase();
-  const out = new Set<string>();
-  const re = /\bthis is\s+([A-Z][a-z]{2,})\b/g;
-  for (const match of input.text.matchAll(re)) {
-    const name = match[1];
-    if (!name) continue;
-    if (name.toLowerCase() === assistantLower) continue;
-    out.add(name);
-  }
-  const re2 = /\bI[' ]?m\s+([A-Z][a-z]{2,})\b/g;
-  for (const match of input.text.matchAll(re2)) {
-    const name = match[1];
-    if (!name) continue;
-    if (name.toLowerCase() === assistantLower) continue;
-    out.add(name);
-  }
-  return [...out];
 }

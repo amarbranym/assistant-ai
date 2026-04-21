@@ -49,6 +49,13 @@ function tokenFromRequest(req: IncomingMessage): string | undefined {
   return token?.trim() || undefined;
 }
 
+function isAbortLikeError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.name === "AbortError") return true;
+  const msg = err.message.toLowerCase();
+  return msg.includes("aborted") || msg.includes("the user aborted");
+}
+
 async function authenticate(req: AuthenticatedSocketRequest): Promise<string> {
   const token = tokenFromRequest(req);
   if (!token) {
@@ -109,6 +116,12 @@ export function attachVoiceWebsocketServer(input: {
         })
         .then(task)
         .catch((err) => {
+          // Normal interruption paths (barge-in, client stop, socket close)
+          // can abort an in-flight turn. Do not surface these as VOICE_TURN_FAILED.
+          if (isAbortLikeError(err)) {
+            logger.info({ err: err.message }, "Voice turn interrupted (abort)");
+            return;
+          }
           logger.error({ err }, "Voice turn failed");
           send(ws, {
             type: "error",
@@ -256,6 +269,7 @@ export function attachVoiceWebsocketServer(input: {
             let firstSttResultLogged = false;
 
             const tryServerBargeIn = (reason: string) => {
+              if (!voiceConfig.autoBargeIn) return;
               if (!session || !session.assistantSpeaking) return;
               const now = Date.now();
               const sinceSpeechStarted =
@@ -263,7 +277,7 @@ export function attachVoiceWebsocketServer(input: {
                   ? Number.POSITIVE_INFINITY
                   : now - session.assistantSpeechStartedAt;
               const sinceLastBargeIn = now - lastBargeInAt;
-              if (sinceSpeechStarted < 450 || sinceLastBargeIn < 1100) return;
+              if (sinceSpeechStarted < 220 || sinceLastBargeIn < 450) return;
               const out = voiceService.interruptAssistantPlayback(session, reason);
               if (out.interrupted) {
                 lastBargeInAt = now;
@@ -353,6 +367,16 @@ export function attachVoiceWebsocketServer(input: {
               onTranscriptPartial: (text: string) => {
                 send(ws, { type: "stt.partial", text });
                 lastPartialText = text.trim();
+                // Barge-in only when STT has actual user text while assistant is
+                // speaking. This avoids cutting off replies from noisy
+                // `speech_started` signals with no meaningful transcript.
+                if (
+                  session?.assistantSpeaking &&
+                  /[a-z0-9\u0900-\u097F]/i.test(lastPartialText) &&
+                  lastPartialText.length >= 2
+                ) {
+                  tryServerBargeIn("deepgram-partial-barge-in");
+                }
                 if (!firstSttResultLogged) {
                   firstSttResultLogged = true;
                   logger.info(
@@ -372,7 +396,9 @@ export function attachVoiceWebsocketServer(input: {
                 const t = lastPartialText.trim();
                 if (t) runTurn(t);
               },
-              onSpeechStarted: () => tryServerBargeIn("deepgram-speech-started"),
+              // `speech_started` is often too eager (echo/noise). We rely on
+              // partial transcript text above for barge-in decisions.
+              onSpeechStarted: () => {},
               onError: (err: unknown) => {
                 logger.warn(
                   { err: err instanceof Error ? err.message : err },

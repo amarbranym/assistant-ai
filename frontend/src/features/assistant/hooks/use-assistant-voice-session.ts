@@ -423,6 +423,19 @@ export function useAssistantVoiceSession(
           sampleRate: 16000,
           mode: input.mode
         });
+        // If websocket opens but backend never acknowledges session.start,
+        // avoid getting stuck forever in "connecting".
+        connectTimeoutRef.current = setTimeout(() => {
+          if (statusRef.current === "connecting" && !sessionReadyRef.current) {
+            setError("Voice session did not start. Check backend logs and auth token.");
+            setStatusSafe("error");
+            try {
+              ws.close();
+            } catch {
+              // no-op
+            }
+          }
+        }, 10000);
       };
 
       ws.onmessage = (ev) => {
@@ -445,6 +458,10 @@ export function useAssistantVoiceSession(
 
         switch (event.type) {
           case "session.started":
+            if (connectTimeoutRef.current) {
+              clearTimeout(connectTimeoutRef.current);
+              connectTimeoutRef.current = null;
+            }
             sessionReadyRef.current = true;
             setCallActive(true);
             setStatusSafe(resolveListenStatus());
@@ -509,6 +526,9 @@ export function useAssistantVoiceSession(
             }, 700);
             break;
           case "error": {
+            const msg = event.message || "";
+            const isAborted =
+              /aborted|aborterror/i.test(msg) || /aborted/i.test(event.code || "");
             const friendly =
               event.code === "VOICE_PROVIDERS_MISCONFIGURED"
                 ? `${event.message}`
@@ -517,7 +537,9 @@ export function useAssistantVoiceSession(
                   : event.code === "TTS_ERROR"
                     ? `Voice generation error: ${event.message}. Check ELEVENLABS_API_KEY in backend/.env.`
                     : event.code === "VOICE_TURN_FAILED"
-                      ? `Assistant reply failed: ${event.message}. Check your LLM provider key (OPENAI_API_KEY).`
+                      ? isAborted
+                        ? "Assistant reply was interrupted or stopped before it finished."
+                        : `Assistant reply failed: ${event.message}. If this persists, check backend/.env for the LLM key that matches your assistant (OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, or GROQ_API_KEY).`
                       : event.message;
             setError(friendly);
             setStatusSafe("error");
@@ -537,13 +559,25 @@ export function useAssistantVoiceSession(
       };
 
       ws.onerror = () => {
-        if (connectTimeoutRef.current) {
-          clearTimeout(connectTimeoutRef.current);
-          connectTimeoutRef.current = null;
+        // Some browsers emit `error` without promptly emitting `close`.
+        // Keep the connect-timeout alive while we're still connecting so the
+        // UI cannot get stuck forever in "connecting".
+        if (
+          statusRef.current === "connecting" &&
+          connectTimeoutRef.current == null
+        ) {
+          connectTimeoutRef.current = setTimeout(() => {
+            if (statusRef.current === "connecting") {
+              setError("Voice connection failed while opening websocket.");
+              setStatusSafe("error");
+              try {
+                ws.close();
+              } catch {
+                // no-op
+              }
+            }
+          }, 4000);
         }
-        // Don't flip to `error` immediately — `onclose` follows and may try
-        // to reconnect. We only set an error message; the final status is
-        // decided in onclose.
         if (env.NEXT_PUBLIC_VOICE_DEBUG) {
           console.info("[voice-session] websocket error event");
         }
@@ -765,7 +799,7 @@ export function useAssistantVoiceSession(
   const handleVadSpeechStart = useCallback(() => {
     if (!playbackActiveRef.current) return;
     const now = Date.now();
-    if (now - lastBargeInAtRef.current < 1200) return;
+    if (now - lastBargeInAtRef.current < 450) return;
     lastBargeInAtRef.current = now;
     interruptAssistant();
   }, [interruptAssistant]);

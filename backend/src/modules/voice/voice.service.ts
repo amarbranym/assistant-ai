@@ -35,7 +35,7 @@ export function assertVoiceProviderKeys(voiceConfig: VoiceResolvedConfig, assist
     Boolean(env.providers.googleGenerativeAiApiKey) ||
     Boolean(env.providers.groqApiKey);
   if (!hasAnyLlmKey) {
-    missing.push("OPENAI_API_KEY (or GOOGLE_GENERATIVE_AI_API_KEY)");
+    missing.push("OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, or GROQ_API_KEY");
   }
 
   if (missing.length > 0) {
@@ -92,7 +92,7 @@ export function resolveVoiceConfig(assistant: Assistant): VoiceResolvedConfig {
           .split("")
           .map((x) => x.trim())
           .filter(Boolean)
-      : [".", "!", "?"];
+      : [".", "!", "?", "।", ",", ";"];
 
   const ttsProvider =
     typeof voice.provider === "string" && voice.provider.trim()
@@ -134,7 +134,7 @@ export function resolveVoiceConfig(assistant: Assistant): VoiceResolvedConfig {
     0.2,
     Math.max(0.004, num(voice.vadEnergyThreshold, 0.014))
   );
-  const vadSilenceMs = Math.min(3000, Math.max(200, Math.floor(num(voice.vadSilenceMs, 650))));
+  const vadSilenceMs = Math.min(3000, Math.max(200, Math.floor(num(voice.vadSilenceMs, 520))));
 
   const deepgramLanguage =
     typeof voice.deepgramLanguage === "string" && voice.deepgramLanguage.trim()
@@ -143,10 +143,10 @@ export function resolveVoiceConfig(assistant: Assistant): VoiceResolvedConfig {
 
   const deepgramEndpointingMs = Math.min(
     5000,
-    Math.max(100, Math.floor(num(voice.deepgramEndpointingMs, 400)))
+    Math.max(100, Math.floor(num(voice.deepgramEndpointingMs, 320)))
   );
 
-  let deepgramUtteranceEndMs: number | null = 1200;
+  let deepgramUtteranceEndMs: number | null = 1000;
   if (voice.deepgramUtteranceEndMs === false || voice.deepgramUtteranceEndMs === 0) {
     deepgramUtteranceEndMs = null;
   } else if (typeof voice.deepgramUtteranceEndMs === "number" && Number.isFinite(voice.deepgramUtteranceEndMs)) {
@@ -167,6 +167,7 @@ export function resolveVoiceConfig(assistant: Assistant): VoiceResolvedConfig {
   const voiceSimilarityBoost = Math.min(1, Math.max(0, num(voice.similarity, 0.75)));
   const voiceSpeed = Math.min(2, Math.max(0.5, num(voice.speed, 1)));
   const useSpeakerBoost = voice.useSpeakerBoost !== false;
+  const autoBargeIn = voice.autoBargeIn !== false;
 
   return {
     ttsProvider,
@@ -185,7 +186,8 @@ export function resolveVoiceConfig(assistant: Assistant): VoiceResolvedConfig {
     voiceStability,
     voiceSimilarityBoost,
     voiceSpeed,
-    useSpeakerBoost
+    useSpeakerBoost,
+    autoBargeIn
   };
 }
 
@@ -225,6 +227,61 @@ export function interruptAssistantPlayback(
   return { interrupted: hadActive, reason };
 }
 
+function isAbortLikeError(err: unknown, signal: AbortSignal): boolean {
+  if (signal.aborted) return true;
+  if (!(err instanceof Error)) return false;
+  if (err.name === "AbortError") return true;
+  const m = err.message.toLowerCase();
+  return m.includes("aborted") || m.includes("the user aborted");
+}
+
+function splitReadyTtsSegments(input: {
+  buffer: string;
+  punctuationBoundaries: string[];
+  flush: boolean;
+}): { segments: string[]; rest: string } {
+  const FIRST_SEGMENT_MIN_CHARS = 10;
+  const FOLLOWUP_SEGMENT_MIN_CHARS = 16;
+  const punctuation = new Set(
+    (input.punctuationBoundaries.length > 0 ? input.punctuationBoundaries : [".", "!", "?", "।"]).map((x) =>
+      x.trim()
+    )
+  );
+  const segments: string[] = [];
+  let lastCut = 0;
+  const src = input.buffer;
+
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    const isHardBreak = ch === "\n" || ch === "\r";
+    const isBoundaryPunctuation = punctuation.has(ch);
+    if (!isHardBreak && !isBoundaryPunctuation) continue;
+
+    const next = src[i + 1] ?? "";
+    const boundarySatisfied =
+      isHardBreak || i === src.length - 1 || /\s/.test(next);
+    if (!boundarySatisfied) continue;
+
+    const candidate = src.slice(lastCut, i + 1).trim();
+    const minChars = segments.length === 0 ? FIRST_SEGMENT_MIN_CHARS : FOLLOWUP_SEGMENT_MIN_CHARS;
+    if (candidate.length >= minChars) {
+      segments.push(candidate);
+      lastCut = i + 1;
+    }
+  }
+
+  let rest = src.slice(lastCut);
+  if (input.flush) {
+    const tail = rest.trim();
+    if (tail.length > 0) {
+      segments.push(tail);
+      rest = "";
+    }
+  }
+
+  return { segments, rest };
+}
+
 export async function runAssistantVoiceTurn(input: {
   session: VoiceSessionState;
   userText: string;
@@ -248,27 +305,94 @@ export async function runAssistantVoiceTurn(input: {
   const llmAbort = new AbortController();
   input.session.llmAbortController = llmAbort;
 
-  const turn = await streamAssistantReply({
-    assistant: input.session.assistant,
-    conversationId: input.session.conversationId,
-    userText: input.userText,
-    abortSignal: llmAbort.signal,
-    tools: input.tools,
-    mode: input.session.mode
-  });
+  let turn: Awaited<ReturnType<typeof streamAssistantReply>>;
+  try {
+    turn = await streamAssistantReply({
+      assistant: input.session.assistant,
+      conversationId: input.session.conversationId,
+      userText: input.userText,
+      abortSignal: llmAbort.signal,
+      tools: input.tools,
+      mode: input.session.mode,
+      channel: "voice"
+    });
+  } catch (err) {
+    input.session.llmAbortController = null;
+    if (isAbortLikeError(err, llmAbort.signal) || input.session.closed) {
+      input.session.assistantSpeaking = false;
+      return;
+    }
+    throw err;
+  }
 
   let finalText = "";
+  let ttsTextBuffer = "";
+  const ttsAbort = new AbortController();
+  const ttsProvider = input.ttsProvider ?? resolveTTSProvider(input.voiceConfig.ttsProvider);
+  input.session.ttsAbortController = ttsAbort;
+  let ttsStarted = false;
+  let ttsQueue: Promise<void> = Promise.resolve();
+
+  const enqueueTtsSegment = (segment: string) => {
+    const text = segment.trim();
+    if (!text) return;
+    ttsQueue = ttsQueue
+      .then(async () => {
+        if (ttsAbort.signal.aborted || input.session.closed) return;
+        if (!ttsStarted) {
+          ttsStarted = true;
+          input.session.assistantSpeaking = true;
+          input.session.assistantSpeechStartedAt = Date.now();
+        }
+        await ttsProvider.streamSpeech({
+          text,
+          voiceId: input.voiceConfig.voiceId || ELEVENLABS_DEFAULT_VOICE_ID,
+          modelId: input.voiceConfig.model,
+          abortSignal: ttsAbort.signal,
+          optimizeStreamingLatency: input.voiceConfig.elevenlabsStreamingLatency,
+          voiceStability: input.voiceConfig.voiceStability,
+          voiceSimilarityBoost: input.voiceConfig.voiceSimilarityBoost,
+          voiceSpeed: input.voiceConfig.voiceSpeed,
+          useSpeakerBoost: input.voiceConfig.useSpeakerBoost,
+          onChunk: input.onAudioChunk
+        });
+      })
+      .catch((err) => {
+        if (isAbortLikeError(err, ttsAbort.signal) || input.session.closed) return;
+        throw err;
+      });
+  };
+
   try {
     for await (const delta of turn.result.textStream) {
       if (llmAbort.signal.aborted) break;
       finalText += delta;
+      ttsTextBuffer += delta;
       input.onTextDelta(delta);
+
+      const chunked = splitReadyTtsSegments({
+        buffer: ttsTextBuffer,
+        punctuationBoundaries: input.voiceConfig.punctuationBoundaries,
+        flush: false
+      });
+      ttsTextBuffer = chunked.rest;
+      for (const segment of chunked.segments) {
+        enqueueTtsSegment(segment);
+      }
     }
+  } catch (err) {
+    if (isAbortLikeError(err, llmAbort.signal) || input.session.closed) {
+      input.session.llmAbortController = null;
+      input.session.assistantSpeaking = false;
+      return;
+    }
+    input.session.llmAbortController = null;
+    throw err;
   } finally {
     input.session.llmAbortController = null;
   }
 
-  if (llmAbort.signal.aborted) {
+  if (llmAbort.signal.aborted || input.session.closed) {
     input.session.assistantSpeaking = false;
     return;
   }
@@ -277,31 +401,27 @@ export async function runAssistantVoiceTurn(input: {
     input.session.assistantSpeaking = false;
     throw new AppError(
       502,
-      "Assistant produced no reply text. Check OPENAI_API_KEY / Google AI credentials and the assistant model in settings.",
+      "Assistant produced no reply text. Check LLM credentials in backend/.env for the assistant’s provider (OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, or GROQ_API_KEY) and model settings.",
       "LLM_EMPTY_RESPONSE"
     );
   }
 
-  const ttsAbort = new AbortController();
-  const ttsProvider = input.ttsProvider ?? resolveTTSProvider(input.voiceConfig.ttsProvider);
-  input.session.ttsAbortController = ttsAbort;
-  input.session.assistantSpeaking = true;
-  input.session.assistantSpeechStartedAt = Date.now();
+  const flushed = splitReadyTtsSegments({
+    buffer: ttsTextBuffer,
+    punctuationBoundaries: input.voiceConfig.punctuationBoundaries,
+    flush: true
+  });
+  for (const segment of flushed.segments) {
+    enqueueTtsSegment(segment);
+  }
 
   try {
-    await ttsProvider.streamSpeech({
-      text: finalText,
-      voiceId: input.voiceConfig.voiceId || ELEVENLABS_DEFAULT_VOICE_ID,
-      modelId: input.voiceConfig.model,
-      abortSignal: ttsAbort.signal,
-      optimizeStreamingLatency: input.voiceConfig.elevenlabsStreamingLatency,
-      voiceStability: input.voiceConfig.voiceStability,
-      voiceSimilarityBoost: input.voiceConfig.voiceSimilarityBoost,
-      voiceSpeed: input.voiceConfig.voiceSpeed,
-      useSpeakerBoost: input.voiceConfig.useSpeakerBoost,
-      onChunk: input.onAudioChunk
-    });
+    await ttsQueue;
+    if (ttsAbort.signal.aborted || input.session.closed) return;
     input.onTurnCompleted(finalText);
+  } catch (err) {
+    if (isAbortLikeError(err, ttsAbort.signal) || input.session.closed) return;
+    throw err;
   } finally {
     input.session.ttsAbortController = null;
     input.session.assistantSpeaking = false;
